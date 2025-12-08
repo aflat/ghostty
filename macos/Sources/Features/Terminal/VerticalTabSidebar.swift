@@ -7,6 +7,9 @@ struct VerticalTabSidebar: View {
     /// The window controller that manages the tabs
     weak var windowController: BaseTerminalController?
     
+    /// Whether the sidebar is on the right side (affects resize handle position)
+    var isRightSide: Bool = false
+    
     /// The tab data model that tracks all tabs
     @StateObject private var tabModel = TabModel()
     
@@ -18,56 +21,79 @@ struct VerticalTabSidebar: View {
     @State private var renameText: String = ""
     @State private var windowToRename: NSWindow? = nil
     
+    /// Sidebar width - persisted in UserDefaults
+    @AppStorage("verticalTabSidebarWidth") private var sidebarWidth: Double = 200
+    
+    /// Whether we're currently resizing
+    @State private var isResizing: Bool = false
+    
+    /// Minimum and maximum width constraints
+    private let minWidth: CGFloat = 120
+    private let maxWidth: CGFloat = 400
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab list
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(tabModel.tabs) { tab in
-                        TabRow(
-                            title: tab.title,
-                            isSelected: tab.isSelected,
-                            keyEquivalent: tab.index < 9 ? "\(tab.index + 1)" : nil,
-                            hasCustomTitle: tabModel.getCustomTitle(for: tab.window) != nil,
-                            onSelect: {
-                                selectTab(tab.window)
-                            },
-                            onClose: {
-                                closeTab(tab.window)
-                            },
-                            onRename: {
-                                windowToRename = tab.window
-                                renameText = tabModel.getCustomTitle(for: tab.window) ?? tab.title
-                                isShowingRenameDialog = true
-                            },
-                            onClearCustomTitle: {
-                                tabModel.clearCustomTitle(for: tab.window)
-                                refreshTabs()
-                            }
-                        )
+        HStack(spacing: 0) {
+            // Resize handle on the left if sidebar is on the right
+            if isRightSide {
+                resizeHandle
+            }
+            
+            // Main sidebar content
+            VStack(spacing: 0) {
+                // Tab list
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(tabModel.tabs) { tab in
+                            TabRow(
+                                title: tab.title,
+                                isSelected: tab.isSelected,
+                                keyEquivalent: tab.index < 9 ? "\(tab.index + 1)" : nil,
+                                hasCustomTitle: tabModel.getCustomTitle(for: tab.window) != nil,
+                                onSelect: {
+                                    selectTab(tab.window)
+                                },
+                                onClose: {
+                                    closeTab(tab.window)
+                                },
+                                onRename: {
+                                    windowToRename = tab.window
+                                    renameText = tabModel.getCustomTitle(for: tab.window) ?? tab.title
+                                    isShowingRenameDialog = true
+                                },
+                                onClearCustomTitle: {
+                                    tabModel.clearCustomTitle(for: tab.window)
+                                    refreshTabs()
+                                }
+                            )
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
-            }
-            
-            Divider()
-            
-            // Footer with new tab button
-            HStack(spacing: 8) {
-                Button(action: createNewTab) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14))
-                }
-                .buttonStyle(.plain)
-                .help("New Tab")
                 
-                Spacer()
+                Divider()
+                
+                // Footer with new tab button
+                HStack(spacing: 8) {
+                    Button(action: createNewTab) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .help("New Tab")
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .frame(width: sidebarWidth)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            
+            // Resize handle on the right if sidebar is on the left
+            if !isRightSide {
+                resizeHandle
+            }
         }
-        .frame(width: 200)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
         .onAppear {
             refreshTabs()
             startRefreshTimer()
@@ -87,6 +113,43 @@ struct VerticalTabSidebar: View {
                 }
             )
         }
+    }
+    
+    /// The resize handle view
+    private var resizeHandle: some View {
+        ZStack {
+            // Subtle border line
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1)
+                .frame(maxHeight: .infinity)
+            
+            // Wider invisible hit area for dragging
+            Rectangle()
+                .fill(isResizing ? Color.accentColor.opacity(0.3) : Color.clear)
+                .frame(width: 6)
+        }
+        .frame(width: 6)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                NSCursor.resizeLeftRight.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    isResizing = true
+                    let delta = isRightSide ? -value.translation.width : value.translation.width
+                    let newWidth = sidebarWidth + delta
+                    sidebarWidth = min(maxWidth, max(minWidth, newWidth))
+                }
+                .onEnded { _ in
+                    isResizing = false
+                }
+        )
     }
     
     // MARK: - Rename Sheet

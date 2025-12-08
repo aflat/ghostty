@@ -88,8 +88,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                 HStack(spacing: 0) {
                     // Left vertical tab sidebar
                     if showLeftTabs {
-                        VerticalTabSidebar(windowController: windowController)
-                        Divider()
+                        VerticalTabSidebar(windowController: windowController, isRightSide: false)
                     }
                     
                     VStack(spacing: 0) {
@@ -126,8 +125,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                     
                     // Right vertical tab sidebar
                     if showRightTabs {
-                        Divider()
-                        VerticalTabSidebar(windowController: windowController)
+                        VerticalTabSidebar(windowController: windowController, isRightSide: true)
                     }
                 }
                 // Ignore safe area to extend up in to the titlebar region if we have the "hidden" titlebar style
