@@ -50,7 +50,7 @@ pub const inlineAssert: fn (bool) void = switch (builtin.mode) {
     .Debug => std.debug.assert,
 
     .ReleaseSmall, .ReleaseSafe, .ReleaseFast => (struct {
-        inline fn assert(ok: bool) void {
+        fn assert(ok: bool) void {
             if (!ok) unreachable;
         }
     }).assert,
