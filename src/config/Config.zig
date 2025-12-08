@@ -1349,6 +1349,23 @@ fullscreen: bool = false,
 /// to get the new title.
 title: ?[:0]const u8 = null,
 
+/// Controls how tab titles are determined when using splits.
+///
+/// Valid values are:
+///
+///   * `focused` - The tab title reflects the currently focused split's title.
+///     This is the default behavior.
+///   * `first` - The tab title always shows the first (top-left) split's title,
+///     regardless of which split is focused.
+///   * `fixed` - The tab title is fixed to the value of the `title` config
+///     option and does not change based on splits.
+///
+/// This is useful when you have multiple splits in a tab and want a consistent
+/// title rather than having it change when switching focus between splits.
+///
+/// Available since: 1.3.0
+@"tab-title-mode": TabTitleMode = .focused,
+
 /// The setting that will change the application class value.
 ///
 /// This controls the class field of the `WM_CLASS` X11 property (when running
@@ -7638,6 +7655,13 @@ pub const OSCColorReportFormat = enum {
     none,
     @"8-bit",
     @"16-bit",
+};
+
+/// See tab-title-mode
+pub const TabTitleMode = enum {
+    focused,
+    first,
+    fixed,
 };
 
 /// The default window theme.

@@ -259,6 +259,16 @@ class BaseTerminalController: NSWindowController,
         if (to.isEmpty) {
             focusedSurface = nil
         }
+        
+        // For "first" mode, we need to re-subscribe if the first surface changed
+        if ghostty.config.tabTitleMode == .first {
+            let oldFirst = from.root?.leftmostLeaf()
+            let newFirst = to.root?.leftmostLeaf()
+            if oldFirst !== newFirst {
+                // First surface changed, re-trigger the subscription
+                focusedSurfaceDidChange(to: focusedSurface)
+            }
+        }
     }
 
     /// Update all surfaces with the focus state. This ensures that libghostty has an accurate view about
@@ -687,21 +697,47 @@ class BaseTerminalController: NSWindowController,
         // Important to cancel any prior subscriptions
         focusedSurfaceCancellables = []
 
-        // Setup our title listener. If we have a focused surface we always use that.
-        // Otherwise, we try to use our last focused surface. In either case, we only
-        // want to care if the surface is in the tree so we don't listen to titles of
-        // closed surfaces.
-        if let titleSurface = focusedSurface ?? lastFocusedSurface,
-           surfaceTree.contains(titleSurface) {
-            // If we have a surface, we want to listen for title changes.
-            titleSurface.$title
-                .combineLatest(titleSurface.$bell)
-                .map { [weak self] in self?.computeTitle(title: $0, bell: $1) ?? "" }
-                .sink { [weak self] in self?.titleDidChange(to: $0) }
-                .store(in: &focusedSurfaceCancellables)
-        } else {
-            // There is no surface to listen to titles for.
-            titleDidChange(to: "👻")
+        // Determine which surface to listen to based on tab-title-mode
+        let titleMode = ghostty.config.tabTitleMode
+        
+        switch titleMode {
+        case .fixed:
+            // Fixed mode: use the configured title and don't listen to changes
+            let fixedTitle = ghostty.config.title ?? "Ghostty"
+            titleDidChange(to: fixedTitle)
+            return
+            
+        case .first:
+            // First mode: always use the first (top-left) surface's title
+            if let root = surfaceTree.root {
+                let firstSurface = root.leftmostLeaf()
+                firstSurface.$title
+                    .combineLatest(firstSurface.$bell)
+                    .map { [weak self] in self?.computeTitle(title: $0, bell: $1) ?? "" }
+                    .sink { [weak self] in self?.titleDidChange(to: $0) }
+                    .store(in: &focusedSurfaceCancellables)
+            } else {
+                titleDidChange(to: "👻")
+            }
+            
+        case .focused:
+            // Focused mode: use the focused surface's title (default behavior)
+            // If we have a focused surface we always use that.
+            // Otherwise, we try to use our last focused surface. In either case, we only
+            // want to care if the surface is in the tree so we don't listen to titles of
+            // closed surfaces.
+            if let titleSurface = focusedSurface ?? lastFocusedSurface,
+               surfaceTree.contains(titleSurface) {
+                // If we have a surface, we want to listen for title changes.
+                titleSurface.$title
+                    .combineLatest(titleSurface.$bell)
+                    .map { [weak self] in self?.computeTitle(title: $0, bell: $1) ?? "" }
+                    .sink { [weak self] in self?.titleDidChange(to: $0) }
+                    .store(in: &focusedSurfaceCancellables)
+            } else {
+                // There is no surface to listen to titles for.
+                titleDidChange(to: "👻")
+            }
         }
     }
     

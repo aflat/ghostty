@@ -149,6 +149,17 @@ extension Ghostty {
             return String(cString: ptr)
         }
 
+        var tabTitleMode: TabTitleMode {
+            let defaultValue = TabTitleMode.focused
+            guard let config = self.config else { return defaultValue }
+            var v: UnsafePointer<Int8>? = nil
+            let key = "tab-title-mode"
+            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
+            guard let ptr = v else { return defaultValue }
+            let str = String(cString: ptr)
+            return TabTitleMode(rawValue: str) ?? defaultValue
+        }
+
         var windowSaveState: String {
             guard let config = self.config else { return "" }
             var v: UnsafePointer<Int8>? = nil
@@ -666,6 +677,12 @@ extension Ghostty.Config {
     enum Scrollbar: String {
         case system
         case never
+    }
+
+    enum TabTitleMode: String {
+        case focused  // Title from focused split (default)
+        case first    // Title from first (top-left) split
+        case fixed    // Fixed title from config
     }
 
     enum MacOSTabsLocation: String {

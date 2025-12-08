@@ -13,6 +13,11 @@ struct VerticalTabSidebar: View {
     /// Timer for refreshing the tab list
     @State private var refreshTimer: Timer?
     
+    /// For the rename dialog
+    @State private var isShowingRenameDialog: Bool = false
+    @State private var renameText: String = ""
+    @State private var windowToRename: NSWindow? = nil
+    
     var body: some View {
         VStack(spacing: 0) {
             // Tab list
@@ -23,11 +28,21 @@ struct VerticalTabSidebar: View {
                             title: tab.title,
                             isSelected: tab.isSelected,
                             keyEquivalent: tab.index < 9 ? "\(tab.index + 1)" : nil,
+                            hasCustomTitle: tabModel.getCustomTitle(for: tab.window) != nil,
                             onSelect: {
                                 selectTab(tab.window)
                             },
                             onClose: {
                                 closeTab(tab.window)
+                            },
+                            onRename: {
+                                windowToRename = tab.window
+                                renameText = tabModel.getCustomTitle(for: tab.window) ?? tab.title
+                                isShowingRenameDialog = true
+                            },
+                            onClearCustomTitle: {
+                                tabModel.clearCustomTitle(for: tab.window)
+                                refreshTabs()
                             }
                         )
                     }
@@ -60,6 +75,57 @@ struct VerticalTabSidebar: View {
         .onDisappear {
             stopRefreshTimer()
         }
+        .sheet(isPresented: $isShowingRenameDialog) {
+            RenameTabSheet(
+                title: $renameText,
+                isPresented: $isShowingRenameDialog,
+                onSave: {
+                    if let window = windowToRename {
+                        tabModel.setCustomTitle(renameText.isEmpty ? nil : renameText, for: window)
+                        refreshTabs()
+                    }
+                }
+            )
+        }
+    }
+    
+    // MARK: - Rename Sheet
+    
+    struct RenameTabSheet: View {
+        @Binding var title: String
+        @Binding var isPresented: Bool
+        let onSave: () -> Void
+        
+        var body: some View {
+            VStack(spacing: 16) {
+                Text("Rename Tab")
+                    .font(.headline)
+                
+                TextField("Tab title", text: $title)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 250)
+                
+                Text("Leave empty to use automatic title")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                    .keyboardShortcut(.escape)
+                    
+                    Button("Save") {
+                        onSave()
+                        isPresented = false
+                    }
+                    .keyboardShortcut(.return)
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(20)
+            .frame(minWidth: 300)
+        }
     }
     
     // MARK: - Tab Data Model
@@ -72,19 +138,73 @@ struct VerticalTabSidebar: View {
         let index: Int
         let isSelected: Bool
         
-        init(window: NSWindow, index: Int, isSelected: Bool) {
+        init(window: NSWindow, index: Int, isSelected: Bool, customTitles: [ObjectIdentifier: String], resolvedTitle: String) {
             self.window = window
-            self.title = window.title
             self.index = index
             self.isSelected = isSelected
-            // Use a combination of window hash and title to force updates when title changes
-            self.id = "\(ObjectIdentifier(window).hashValue)-\(window.title)"
+            
+            // Use custom title if set, otherwise use resolved title (based on tab-title-mode)
+            let windowId = ObjectIdentifier(window)
+            if let customTitle = customTitles[windowId], !customTitle.isEmpty {
+                self.title = customTitle
+                self.id = "\(windowId.hashValue)-custom-\(customTitle)"
+            } else {
+                self.title = resolvedTitle
+                self.id = "\(windowId.hashValue)-\(resolvedTitle)"
+            }
         }
     }
     
-    /// Observable model that holds the tab list
+    /// Observable model that holds the tab list and custom titles
     class TabModel: ObservableObject {
         @Published var tabs: [TabData] = []
+        /// Custom titles set by the user (keyed by window ObjectIdentifier)
+        var customTitles: [ObjectIdentifier: String] = [:]
+        
+        func setCustomTitle(_ title: String?, for window: NSWindow) {
+            let id = ObjectIdentifier(window)
+            if let title = title, !title.isEmpty {
+                customTitles[id] = title
+            } else {
+                customTitles.removeValue(forKey: id)
+            }
+        }
+        
+        func getCustomTitle(for window: NSWindow) -> String? {
+            return customTitles[ObjectIdentifier(window)]
+        }
+        
+        func clearCustomTitle(for window: NSWindow) {
+            customTitles.removeValue(forKey: ObjectIdentifier(window))
+        }
+    }
+    
+    /// Get the title for a window based on the tab-title-mode config
+    private func resolveTitle(for window: NSWindow, controller: BaseTerminalController?) -> String {
+        guard let controller = controller else { return window.title }
+        
+        let titleMode = controller.ghostty.config.tabTitleMode
+        
+        switch titleMode {
+        case .focused:
+            // Use the window's current title (which is set by the focused surface)
+            return window.title
+            
+        case .first:
+            // Get the title from the first (top-left) surface in the split tree
+            if let root = controller.surfaceTree.root {
+                let firstSurface = root.leftmostLeaf()
+                let surfaceTitle = firstSurface.title
+                if !surfaceTitle.isEmpty {
+                    return surfaceTitle
+                }
+            }
+            return window.title
+            
+        case .fixed:
+            // Use the configured title, or fallback to "Ghostty"
+            return controller.ghostty.config.title ?? "Ghostty"
+        }
     }
     
     // MARK: - Tab Row
@@ -93,8 +213,11 @@ struct VerticalTabSidebar: View {
         let title: String
         let isSelected: Bool
         let keyEquivalent: String?
+        let hasCustomTitle: Bool
         let onSelect: () -> Void
         let onClose: () -> Void
+        let onRename: () -> Void
+        let onClearCustomTitle: () -> Void
         
         @State private var isHovering: Bool = false
         
@@ -106,6 +229,13 @@ struct VerticalTabSidebar: View {
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.secondary)
                         .frame(width: 28)
+                }
+                
+                // Custom title indicator
+                if hasCustomTitle {
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.accentColor.opacity(0.7))
                 }
                 
                 // Tab title
@@ -141,6 +271,20 @@ struct VerticalTabSidebar: View {
             .onHover { hovering in
                 isHovering = hovering
             }
+            .contextMenu {
+                Button("Rename Tab...") {
+                    onRename()
+                }
+                if hasCustomTitle {
+                    Button("Clear Custom Title") {
+                        onClearCustomTitle()
+                    }
+                }
+                Divider()
+                Button("Close Tab") {
+                    onClose()
+                }
+            }
             .padding(.horizontal, 4)
         }
     }
@@ -165,12 +309,18 @@ struct VerticalTabSidebar: View {
             selectedWindow = window
         }
         
-        // Build the tab data with current titles
+        // Build the tab data with current titles (using custom titles if set)
         let newTabs = windows.enumerated().map { index, win in
-            TabData(
+            // Get the controller for this window to resolve title based on config
+            let controller = win.windowController as? BaseTerminalController
+            let resolvedTitle = resolveTitle(for: win, controller: controller)
+            
+            return TabData(
                 window: win,
                 index: index,
-                isSelected: win == selectedWindow
+                isSelected: win == selectedWindow,
+                customTitles: tabModel.customTitles,
+                resolvedTitle: resolvedTitle
             )
         }
         
