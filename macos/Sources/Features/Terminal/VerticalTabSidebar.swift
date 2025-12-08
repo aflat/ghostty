@@ -7,11 +7,8 @@ struct VerticalTabSidebar: View {
     /// The window controller that manages the tabs
     weak var windowController: BaseTerminalController?
     
-    /// The currently selected tab index
-    @State private var selectedIndex: Int = 0
-    
-    /// All windows in the tab group
-    @State private var tabbedWindows: [NSWindow] = []
+    /// The tab data model that tracks all tabs
+    @StateObject private var tabModel = TabModel()
     
     /// Timer for refreshing the tab list
     @State private var refreshTimer: Timer?
@@ -21,16 +18,16 @@ struct VerticalTabSidebar: View {
             // Tab list
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(Array(tabbedWindows.enumerated()), id: \.element) { index, window in
+                    ForEach(tabModel.tabs) { tab in
                         TabRow(
-                            title: window.title,
-                            isSelected: index == selectedIndex,
-                            keyEquivalent: index < 9 ? "\(index + 1)" : nil,
+                            title: tab.title,
+                            isSelected: tab.isSelected,
+                            keyEquivalent: tab.index < 9 ? "\(tab.index + 1)" : nil,
                             onSelect: {
-                                selectTab(at: index)
+                                selectTab(tab.window)
                             },
                             onClose: {
-                                closeTab(window)
+                                closeTab(tab.window)
                             }
                         )
                     }
@@ -63,6 +60,31 @@ struct VerticalTabSidebar: View {
         .onDisappear {
             stopRefreshTimer()
         }
+    }
+    
+    // MARK: - Tab Data Model
+    
+    /// Represents a single tab's data
+    struct TabData: Identifiable {
+        let id: String  // Unique ID combining window hash and title for proper updates
+        let window: NSWindow
+        let title: String
+        let index: Int
+        let isSelected: Bool
+        
+        init(window: NSWindow, index: Int, isSelected: Bool) {
+            self.window = window
+            self.title = window.title
+            self.index = index
+            self.isSelected = isSelected
+            // Use a combination of window hash and title to force updates when title changes
+            self.id = "\(ObjectIdentifier(window).hashValue)-\(window.title)"
+        }
+    }
+    
+    /// Observable model that holds the tab list
+    class TabModel: ObservableObject {
+        @Published var tabs: [TabData] = []
     }
     
     // MARK: - Tab Row
@@ -127,36 +149,48 @@ struct VerticalTabSidebar: View {
     
     private func refreshTabs() {
         guard let window = windowController?.window else {
-            tabbedWindows = []
-            selectedIndex = 0
+            tabModel.tabs = []
             return
         }
         
-        // Get all tabbed windows
+        // Get all tabbed windows and the selected one
+        let windows: [NSWindow]
+        let selectedWindow: NSWindow?
+        
         if let tabGroup = window.tabGroup {
-            tabbedWindows = tabGroup.windows
-            
-            // Update selected index
-            if let selectedWindow = tabGroup.selectedWindow,
-               let index = tabbedWindows.firstIndex(of: selectedWindow) {
-                selectedIndex = index
-            }
+            windows = tabGroup.windows
+            selectedWindow = tabGroup.selectedWindow
         } else {
-            tabbedWindows = [window]
-            selectedIndex = 0
+            windows = [window]
+            selectedWindow = window
+        }
+        
+        // Build the tab data with current titles
+        let newTabs = windows.enumerated().map { index, win in
+            TabData(
+                window: win,
+                index: index,
+                isSelected: win == selectedWindow
+            )
+        }
+        
+        // Only update if something changed (to avoid unnecessary re-renders)
+        let newIds = newTabs.map { $0.id }
+        let oldIds = tabModel.tabs.map { $0.id }
+        
+        if newIds != oldIds {
+            tabModel.tabs = newTabs
         }
     }
     
-    private func selectTab(at index: Int) {
-        guard index >= 0, index < tabbedWindows.count else { return }
-        let window = tabbedWindows[index]
+    private func selectTab(_ window: NSWindow) {
         window.makeKeyAndOrderFront(nil)
-        selectedIndex = index
+        refreshTabs()
     }
     
     private func closeTab(_ window: NSWindow) {
         // If this is the only tab, close the window
-        if tabbedWindows.count <= 1 {
+        if tabModel.tabs.count <= 1 {
             window.close()
             return
         }
