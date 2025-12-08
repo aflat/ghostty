@@ -899,6 +899,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             ghostty: self.ghostty,
             viewModel: self,
             delegate: self,
+            windowController: self
         ))
         
         // If we have a default size, we want to apply it.

@@ -28,6 +28,7 @@ const Surface = @import("surface.zig").Surface;
 const Tab = @import("tab.zig").Tab;
 const DebugWarning = @import("debug_warning.zig").DebugWarning;
 const CommandPalette = @import("command_palette.zig").CommandPalette;
+const VerticalTabSidebar = @import("vertical_tab_sidebar.zig").VerticalTabSidebar;
 const WeakRef = @import("../weak_ref.zig").WeakRef;
 
 const log = std.log.scoped(.gtk_ghostty_window);
@@ -195,6 +196,21 @@ pub const Window = extern struct {
             );
         };
 
+        pub const @"vertical-tabs-visible" = struct {
+            pub const name = "vertical-tabs-visible";
+            const impl = gobject.ext.defineProperty(
+                name,
+                Self,
+                bool,
+                .{
+                    .default = false,
+                    .accessor = gobject.ext.typedAccessor(Self, bool, .{
+                        .getter = Self.getVerticalTabsVisible,
+                    }),
+                },
+            );
+        };
+
         pub const @"toolbar-style" = struct {
             pub const name = "toolbar-style";
             const impl = gobject.ext.defineProperty(
@@ -258,6 +274,9 @@ pub const Window = extern struct {
         tab_view: *adw.TabView,
         toolbar: *adw.ToolbarView,
         toast_overlay: *adw.ToastOverlay,
+        vertical_tab_sidebar: *VerticalTabSidebar,
+        vertical_tab_separator: *gtk.Separator,
+        main_content_box: *gtk.Box,
 
         pub var offset: c_int = 0;
     };
@@ -597,6 +616,7 @@ pub const Window = extern struct {
             "tabs-wide",
             "toolbar-style",
             "titlebar-style",
+            "vertical-tabs-visible",
         }) |key| {
             self.as(gobject.Object).notifyByPspec(
                 @field(properties, key).impl.param_spec,
@@ -626,6 +646,24 @@ pub const Window = extern struct {
         switch (config.@"gtk-tabs-location") {
             .top => priv.toolbar.addTopBar(priv.tab_bar.as(gtk.Widget)),
             .bottom => priv.toolbar.addBottomBar(priv.tab_bar.as(gtk.Widget)),
+            .left => {
+                // Ensure sidebar is at the start (left side)
+                priv.main_content_box.reorderChildAfter(
+                    priv.vertical_tab_separator.as(gtk.Widget),
+                    priv.vertical_tab_sidebar.as(gtk.Widget),
+                );
+            },
+            .right => {
+                // Move sidebar to the end (right side)
+                priv.main_content_box.reorderChildAfter(
+                    priv.vertical_tab_sidebar.as(gtk.Widget),
+                    null, // After all other children (at the end)
+                );
+                priv.main_content_box.reorderChildAfter(
+                    priv.vertical_tab_separator.as(gtk.Widget),
+                    priv.vertical_tab_sidebar.as(gtk.Widget),
+                );
+            },
         }
 
         // Do our window-protocol specific appearance sync.
@@ -938,6 +976,12 @@ pub const Window = extern struct {
         const priv = self.private();
         const config = if (priv.config) |v| v.get() else return true;
 
+        // If using vertical tabs (left/right), hide the horizontal tab bar
+        switch (config.@"gtk-tabs-location") {
+            .left, .right => return false,
+            .top, .bottom => {},
+        }
+
         switch (config.@"gtk-titlebar-style") {
             .tabs => {
                 // *Conditionally* disable the tab bar when maximized, the titlebar
@@ -954,6 +998,17 @@ pub const Window = extern struct {
                 };
             },
         }
+    }
+
+    fn getVerticalTabsVisible(self: *Self) bool {
+        const priv = self.private();
+        const config = if (priv.config) |v| v.get() else return false;
+
+        // Vertical tabs are visible when gtk-tabs-location is left or right
+        return switch (config.@"gtk-tabs-location") {
+            .left, .right => true,
+            .top, .bottom => false,
+        };
     }
 
     fn getTabsWide(self: *Self) bool {
@@ -1949,6 +2004,7 @@ pub const Window = extern struct {
             gobject.ext.ensureType(SplitTree);
             gobject.ext.ensureType(Surface);
             gobject.ext.ensureType(Tab);
+            gobject.ext.ensureType(VerticalTabSidebar);
             gtk.Widget.Class.setTemplateFromResource(
                 class.as(gtk.Widget.Class),
                 comptime gresource.blueprint(.{
@@ -1970,6 +2026,7 @@ pub const Window = extern struct {
                 properties.@"tabs-wide".impl,
                 properties.@"toolbar-style".impl,
                 properties.@"titlebar-style".impl,
+                properties.@"vertical-tabs-visible".impl,
             });
 
             // Bindings
@@ -1978,6 +2035,9 @@ pub const Window = extern struct {
             class.bindTemplateChildPrivate("tab_view", .{});
             class.bindTemplateChildPrivate("toolbar", .{});
             class.bindTemplateChildPrivate("toast_overlay", .{});
+            class.bindTemplateChildPrivate("vertical_tab_sidebar", .{});
+            class.bindTemplateChildPrivate("vertical_tab_separator", .{});
+            class.bindTemplateChildPrivate("main_content_box", .{});
 
             // Template Callbacks
             class.bindTemplateCallback("realize", &windowRealize);

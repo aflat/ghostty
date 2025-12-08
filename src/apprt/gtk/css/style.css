@@ -159,3 +159,46 @@ label.resize-overlay {
   margin: 0;
   padding: 0;
 }
+
+/*
+ * Vertical Tab Sidebar
+ */
+.vertical-tab-sidebar {
+  background-color: rgba(0, 0, 0, 0.03);
+  /* after GTK 4.16 is a requirement, switch to the following: */
+  /* background-color: color-mix(in srgb, var(--headerbar-bg-color), transparent 50%); */
+}
+
+.vertical-tab-sidebar listbox {
+  background: transparent;
+}
+
+.vertical-tab-sidebar listbox row {
+  padding: 2px 4px;
+  margin: 2px 4px;
+  border-radius: 6px;
+}
+
+.vertical-tab-sidebar listbox row:selected {
+  background-color: rgba(0, 0, 0, 0.08);
+  /* after GTK 4.16 is a requirement, switch to the following: */
+  /* background-color: color-mix(in srgb, var(--accent-color), transparent 80%); */
+}
+
+.vertical-tab-sidebar listbox row.needs-attention {
+  font-weight: bold;
+}
+
+.vertical-tab-sidebar listbox row.needs-attention::before {
+  content: "●";
+  color: rgba(53, 132, 228, 1);
+  margin-right: 4px;
+}
+
+.vertical-tab-sidebar .tab-title {
+  font-size: 0.9em;
+}
+
+.vertical-tab-sidebar-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}

@@ -147,22 +147,39 @@ template $GhosttyWindow: Adw.ApplicationWindow {
         }
       }
 
-      Box {
-        orientation: vertical;
+      Box main_content_box {
+        orientation: horizontal;
 
-        $GhosttyDebugWarning {
-          visible: bind template.debug;
+        $GhosttyVerticalTabSidebar vertical_tab_sidebar {
+          visible: bind template.vertical-tabs-visible;
+          tab-view: tab_view;
+          tab-overview-open: bind tab_overview.open bidirectional;
+          new-tab-request => $new_tab();
         }
 
-        Adw.ToastOverlay toast_overlay {
-          Adw.TabView tab_view {
-            notify::n-pages => $notify_n_pages();
-            notify::selected-page => $notify_selected_page();
-            close-page => $close_page();
-            page-attached => $page_attached();
-            page-detached => $page_detached();
-            create-window => $tab_create_window();
-            shortcuts: none;
+        Separator vertical_tab_separator {
+          visible: bind template.vertical-tabs-visible;
+          orientation: vertical;
+        }
+
+        Box {
+          orientation: vertical;
+          hexpand: true;
+
+          $GhosttyDebugWarning {
+            visible: bind template.debug;
+          }
+
+          Adw.ToastOverlay toast_overlay {
+            Adw.TabView tab_view {
+              notify::n-pages => $notify_n_pages();
+              notify::selected-page => $notify_selected_page();
+              close-page => $close_page();
+              page-attached => $page_attached();
+              page-detached => $page_detached();
+              create-window => $tab_create_window();
+              shortcuts: none;
+            }
           }
         }
       }

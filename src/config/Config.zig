@@ -2883,6 +2883,30 @@ keybind: Keybinds = .{},
 /// Changing this option at runtime only applies to new windows.
 @"macos-titlebar-style": MacTitlebarStyle = .transparent,
 
+/// The location of the tab bar on macOS. This controls where tabs are
+/// displayed in the window.
+///
+/// Valid values are:
+///
+///   * `native` - Use the native macOS tab bar (horizontal, in the titlebar
+///     area). This is the default.
+///   * `left` - Display tabs in a vertical sidebar on the left side of the
+///     window.
+///   * `right` - Display tabs in a vertical sidebar on the right side of the
+///     window.
+///   * `hidden` - Hide the tab bar completely. Use keybinds to switch between
+///     tabs.
+///
+/// When using `left` or `right`, the native macOS tab bar will be hidden and
+/// replaced with a custom vertical tab sidebar.
+///
+/// The default value is `native`.
+///
+/// Changing this option at runtime only applies to new windows.
+///
+/// Available since: 1.3.0
+@"macos-tabs-location": MacTabsLocation = .native,
+
 /// Whether the proxy icon in the macOS titlebar is visible. The proxy icon
 /// is the icon that represents the folder of the current working directory.
 /// You can see this very clearly in the macOS built-in Terminal.app
@@ -3210,13 +3234,14 @@ else
 @"gtk-titlebar": bool = true,
 
 /// Determines the side of the screen that the GTK tab bar will stick to.
-/// Top, bottom, and hidden are supported. The default is top.
+/// Valid values are `top`, `bottom`, `left`, and `right`. The default is `top`.
 ///
-/// When `hidden` is set, a tab button displaying the number of tabs will appear
-/// in the title bar. It has the ability to open a tab overview for displaying
-/// tabs. Alternatively, you can use the `toggle_tab_overview` action in a
-/// keybind if your window doesn't have a title bar, or you can switch tabs
-/// with keybinds.
+/// When set to `left` or `right`, a vertical tab sidebar will be displayed
+/// instead of the standard horizontal tab bar. This is useful for users who
+/// prefer a sidebar-style tab interface or have many tabs open.
+///
+/// Note: When using `left` or `right`, the tab overview button will still
+/// be available in the header bar for accessing the full tab overview.
 @"gtk-tabs-location": GtkTabsLocation = .top,
 
 /// If this is `true`, the titlebar will be hidden when the window is maximized,
@@ -7644,6 +7669,14 @@ pub const MacTitlebarStyle = enum {
     hidden,
 };
 
+/// See macos-tabs-location
+pub const MacTabsLocation = enum {
+    native,
+    left,
+    right,
+    hidden,
+};
+
 /// See macos-titlebar-proxy-icon
 pub const MacTitlebarProxyIcon = enum {
     visible,
@@ -7703,6 +7736,8 @@ pub const GtkSingleInstance = enum {
 pub const GtkTabsLocation = enum {
     top,
     bottom,
+    left,
+    right,
 };
 
 /// See gtk-toolbar-style
