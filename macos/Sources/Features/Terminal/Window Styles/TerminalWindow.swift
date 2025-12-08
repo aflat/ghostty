@@ -177,14 +177,21 @@ class TerminalWindow: NSWindow {
     }
 
     override func addTitlebarAccessoryViewController(_ childViewController: NSTitlebarAccessoryViewController) {
-        super.addTitlebarAccessoryViewController(childViewController)
-
         // Tab bar is attached as a titlebar accessory view controller (layout bottom). We
         // can detect when it is shown or hidden by overriding add/remove and searching for
         // it. This has been verified to work on macOS 12 to 26
         if isTabBar(childViewController) {
+            // When using vertical tabs or hidden mode, don't add the tab bar at all
+            if derivedConfig.macosTabsLocation != .native {
+                // Don't call super - this prevents the tab bar from being added
+                return
+            }
+            
             childViewController.identifier = Self.tabBarIdentifier
+            super.addTitlebarAccessoryViewController(childViewController)
             tabBarDidAppear()
+        } else {
+            super.addTitlebarAccessoryViewController(childViewController)
         }
     }
 
@@ -520,12 +527,14 @@ class TerminalWindow: NSWindow {
         let backgroundColor: NSColor
         let backgroundOpacity: Double
         let macosWindowButtons: Ghostty.MacOSWindowButtons
+        let macosTabsLocation: Ghostty.MacOSTabsLocation
 
         init() {
             self.title = nil
             self.backgroundColor = NSColor.windowBackgroundColor
             self.backgroundOpacity = 1
             self.macosWindowButtons = .visible
+            self.macosTabsLocation = .native
         }
 
         init(_ config: Ghostty.Config) {
@@ -533,6 +542,7 @@ class TerminalWindow: NSWindow {
             self.backgroundColor = NSColor(config.backgroundColor)
             self.backgroundOpacity = config.backgroundOpacity
             self.macosWindowButtons = config.macosWindowButtons
+            self.macosTabsLocation = config.macosTabsLocation
         }
     }
 }

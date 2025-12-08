@@ -149,15 +149,15 @@ extension Ghostty {
             return String(cString: ptr)
         }
 
-        var tabTitleMode: TabTitleMode {
-            let defaultValue = TabTitleMode.focused
+        var tabTitleMode: Ghostty.TabTitleMode {
+            let defaultValue = Ghostty.TabTitleMode.focused
             guard let config = self.config else { return defaultValue }
             var v: UnsafePointer<Int8>? = nil
             let key = "tab-title-mode"
             guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
             guard let ptr = v else { return defaultValue }
             let str = String(cString: ptr)
-            return TabTitleMode(rawValue: str) ?? defaultValue
+            return Ghostty.TabTitleMode(rawValue: str) ?? defaultValue
         }
 
         var windowSaveState: String {
@@ -282,15 +282,15 @@ extension Ghostty {
             return String(cString: ptr)
         }
 
-        var macosTabsLocation: MacOSTabsLocation {
-            let defaultValue = MacOSTabsLocation.native
+        var macosTabsLocation: Ghostty.MacOSTabsLocation {
+            let defaultValue = Ghostty.MacOSTabsLocation.native
             guard let config = self.config else { return defaultValue }
             var v: UnsafePointer<Int8>? = nil
             let key = "macos-tabs-location"
             guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else { return defaultValue }
             guard let ptr = v else { return defaultValue }
             let str = String(cString: ptr)
-            return MacOSTabsLocation(rawValue: str) ?? defaultValue
+            return Ghostty.MacOSTabsLocation(rawValue: str) ?? defaultValue
         }
 
         var macosTitlebarProxyIcon: MacOSTitlebarProxyIcon {
@@ -677,19 +677,6 @@ extension Ghostty.Config {
     enum Scrollbar: String {
         case system
         case never
-    }
-
-    enum TabTitleMode: String {
-        case focused  // Title from focused split (default)
-        case first    // Title from first (top-left) split
-        case fixed    // Fixed title from config
-    }
-
-    enum MacOSTabsLocation: String {
-        case native   // Use native macOS tab bar (default)
-        case left     // Vertical tabs on the left
-        case right    // Vertical tabs on the right
-        case hidden   // No tab UI (use keybinds only)
     }
 
     enum ResizeOverlay : String {
