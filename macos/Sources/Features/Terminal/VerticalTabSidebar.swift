@@ -387,11 +387,13 @@ struct VerticalTabSidebar: View {
             )
         }
         
-        // Only update if something changed (to avoid unnecessary re-renders)
+        // Check if anything changed (IDs or selection state)
         let newIds = newTabs.map { $0.id }
         let oldIds = tabModel.tabs.map { $0.id }
+        let newSelection = newTabs.map { $0.isSelected }
+        let oldSelection = tabModel.tabs.map { $0.isSelected }
         
-        if newIds != oldIds {
+        if newIds != oldIds || newSelection != oldSelection {
             tabModel.tabs = newTabs
         }
     }
