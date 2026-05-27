@@ -675,6 +675,11 @@ typedef struct {
   const char* title;
 } ghostty_action_set_title_s;
 
+// apprt.action.SetBadge.C
+typedef struct {
+  const char* badge;
+} ghostty_action_set_badge_s;
+
 // apprt.action.PromptTitle
 typedef enum {
   GHOSTTY_PROMPT_TITLE_SURFACE,
@@ -925,6 +930,8 @@ typedef enum {
   GHOSTTY_ACTION_SET_TITLE,
   GHOSTTY_ACTION_SET_TAB_TITLE,
   GHOSTTY_ACTION_PROMPT_TITLE,
+  GHOSTTY_ACTION_SET_BADGE,
+  GHOSTTY_ACTION_PROMPT_BADGE,
   GHOSTTY_ACTION_PWD,
   GHOSTTY_ACTION_MOUSE_SHAPE,
   GHOSTTY_ACTION_MOUSE_VISIBILITY,
@@ -975,6 +982,7 @@ typedef union {
   ghostty_action_set_title_s set_title;
   ghostty_action_set_title_s set_tab_title;
   ghostty_action_prompt_title_e prompt_title;
+  ghostty_action_set_badge_s set_badge;
   ghostty_action_pwd_s pwd;
   ghostty_action_mouse_shape_e mouse_shape;
   ghostty_action_mouse_visibility_e mouse_visibility;

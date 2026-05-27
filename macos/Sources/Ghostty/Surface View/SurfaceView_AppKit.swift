@@ -583,6 +583,35 @@ extension Ghostty {
             }
         }
 
+        /// Set the surface badge by prompting the user.
+        func promptBadge() {
+            let alert = NSAlert()
+            alert.messageText = "Set Terminal Badge"
+            alert.informativeText = "Leave blank to clear the badge."
+            alert.alertStyle = .informational
+
+            let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 250, height: 24))
+            textField.stringValue = badge ?? ""
+            alert.accessoryView = textField
+
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+
+            alert.window.initialFirstResponder = textField
+
+            let completionHandler: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+                guard let self else { return }
+                guard response == .alertFirstButtonReturn else { return }
+                setBadge(textField.stringValue)
+            }
+
+            if let window {
+                alert.beginSheetModal(for: window, completionHandler: completionHandler)
+            } else {
+                completionHandler(alert.runModal())
+            }
+        }
+
         func setTitle(_ title: String) {
             // This fixes an issue where very quick changes to the title could
             // cause an unpleasant flickering. We set a timer so that we can
@@ -1585,6 +1614,8 @@ extension Ghostty {
             item = menu.addItem(withTitle: "Change Tab Title...", action: #selector(BaseTerminalController.changeTabTitle(_:)), keyEquivalent: "")
             item.setImageIfDesired(systemSymbolName: "pencil.line")
             item = menu.addItem(withTitle: "Change Terminal Title...", action: #selector(changeTitle(_:)), keyEquivalent: "")
+            item = menu.addItem(withTitle: "Set Terminal Badge...", action: #selector(promptBadge(_:)), keyEquivalent: "")
+            item.setImageIfDesired(systemSymbolName: "tag.fill")
 
             return menu
         }
@@ -1725,6 +1756,10 @@ extension Ghostty {
 
         @IBAction func changeTitle(_ sender: Any) {
             promptTitle()
+        }
+
+        @IBAction func promptBadge(_ sender: Any) {
+            self.promptBadge()
         }
 
         /// Show a user notification and associate it with this surface
