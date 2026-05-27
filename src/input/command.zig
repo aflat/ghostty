@@ -531,6 +531,12 @@ fn actionCommands(action: Action.Key) []const Command {
             .description = "Toggle read-only mode for the current surface.",
         }},
 
+        .toggle_broadcast => comptime &.{.{
+            .action = .toggle_broadcast,
+            .title = "Toggle Broadcast Mode",
+            .description = "Broadcast keyboard input to visible terminals in the current tab.",
+        }},
+
         .equalize_splits => comptime &.{.{
             .action = .equalize_splits,
             .title = "Equalize Splits",

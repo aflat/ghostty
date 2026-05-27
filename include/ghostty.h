@@ -475,6 +475,7 @@ typedef struct {
   ghostty_env_var_s* env_vars;
   size_t env_var_count;
   const char* initial_input;
+  const char* scrollback_history_path;
   bool wait_after_command;
   ghostty_surface_context_e context;
 } ghostty_surface_config_s;
@@ -656,6 +657,12 @@ typedef enum {
   GHOSTTY_READONLY_OFF,
   GHOSTTY_READONLY_ON,
 } ghostty_action_readonly_e;
+
+// apprt.action.BroadcastMode
+typedef enum {
+  GHOSTTY_BROADCAST_MODE_OFF,
+  GHOSTTY_BROADCAST_MODE_ON,
+} ghostty_action_broadcast_mode_e;
 
 // apprt.action.DesktopNotification.C
 typedef struct {
@@ -947,6 +954,7 @@ typedef enum {
   GHOSTTY_ACTION_SEARCH_TOTAL,
   GHOSTTY_ACTION_SEARCH_SELECTED,
   GHOSTTY_ACTION_READONLY,
+  GHOSTTY_ACTION_BROADCAST_MODE,
   GHOSTTY_ACTION_COPY_TITLE_TO_CLIPBOARD,
 } ghostty_action_tag_e;
 
@@ -989,6 +997,7 @@ typedef union {
   ghostty_action_search_total_s search_total;
   ghostty_action_search_selected_s search_selected;
   ghostty_action_readonly_e readonly;
+  ghostty_action_broadcast_mode_e broadcast_mode;
 } ghostty_action_u;
 
 typedef struct {
@@ -1011,6 +1020,9 @@ typedef void (*ghostty_runtime_write_clipboard_cb)(void*,
                                                    size_t,
                                                    bool);
 typedef void (*ghostty_runtime_close_surface_cb)(void*, bool);
+typedef bool (*ghostty_runtime_toggle_broadcast_cb)(void*);
+typedef bool (*ghostty_runtime_broadcast_enabled_cb)(void*);
+typedef bool (*ghostty_runtime_broadcast_target_cb)(void*, void*);
 typedef bool (*ghostty_runtime_action_cb)(ghostty_app_t,
                                           ghostty_target_s,
                                           ghostty_action_s);
@@ -1024,6 +1036,9 @@ typedef struct {
   ghostty_runtime_confirm_read_clipboard_cb confirm_read_clipboard_cb;
   ghostty_runtime_write_clipboard_cb write_clipboard_cb;
   ghostty_runtime_close_surface_cb close_surface_cb;
+  ghostty_runtime_toggle_broadcast_cb toggle_broadcast_cb;
+  ghostty_runtime_broadcast_enabled_cb broadcast_enabled_cb;
+  ghostty_runtime_broadcast_target_cb broadcast_target_cb;
 } ghostty_runtime_config_s;
 
 // apprt.ipc.Target.Key
@@ -1116,6 +1131,7 @@ GHOSTTY_API void ghostty_surface_set_occlusion(ghostty_surface_t, bool);
 GHOSTTY_API void ghostty_surface_set_size(ghostty_surface_t, uint32_t, uint32_t);
 GHOSTTY_API ghostty_surface_size_s ghostty_surface_size(ghostty_surface_t);
 GHOSTTY_API uint64_t ghostty_surface_foreground_pid(ghostty_surface_t);
+GHOSTTY_API ghostty_string_s ghostty_surface_pwd(ghostty_surface_t);
 GHOSTTY_API ghostty_string_s ghostty_surface_tty_name(ghostty_surface_t);
 GHOSTTY_API void ghostty_surface_set_color_scheme(ghostty_surface_t,
                                                      ghostty_color_scheme_e);
