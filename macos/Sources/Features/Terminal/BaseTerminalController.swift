@@ -97,7 +97,11 @@ class BaseTerminalController: NSWindowController,
     /// An override title for the tab/window set by the user via prompt_tab_title.
     /// When set, this takes precedence over the computed title from the terminal.
     var titleOverride: String? {
-        didSet { applyTitleToWindow() }
+        didSet {
+            guard titleOverride != oldValue else { return }
+            applyTitleToWindow(forceVerticalTabsRefresh: true)
+            invalidateRestorableState()
+        }
     }
 
     /// The last computed title from the focused surface (without the override).
@@ -927,7 +931,7 @@ class BaseTerminalController: NSWindowController,
         applyTitleToWindow()
     }
 
-    private func applyTitleToWindow() {
+    private func applyTitleToWindow(forceVerticalTabsRefresh: Bool = false) {
         guard let window else { return }
 
         let title: String
@@ -939,9 +943,14 @@ class BaseTerminalController: NSWindowController,
             title = lastComputedTitle
         }
 
-        guard window.title != title else { return }
-        window.title = title
-        postVerticalTabsDidChange()
+        let changed = window.title != title
+        if changed {
+            window.title = title
+        }
+
+        if changed || forceVerticalTabsRefresh {
+            postVerticalTabsDidChange()
+        }
     }
 
     func pwdDidChange(to: URL?) {
