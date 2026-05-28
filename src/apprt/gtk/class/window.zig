@@ -1468,6 +1468,15 @@ pub const Window = extern struct {
         // If the tab was previously marked as needing attention
         // (e.g. due to a bell character), we now unmark that
         page.setNeedsAttention(@intFromBool(false));
+
+        const n_pages = priv.tab_view.getNPages();
+        var i: c_int = 0;
+        while (i < n_pages) : (i += 1) {
+            const tab_page = priv.tab_view.getNthPage(i) orelse continue;
+            const tab_child = tab_page.getChild();
+            const tab = gobject.ext.cast(Tab, tab_child) orelse continue;
+            tab.syncBroadcastInputState();
+        }
     }
 
     fn tabViewPageAttached(
@@ -1511,6 +1520,7 @@ pub const Window = extern struct {
         if (tab.getSurfaceTree()) |tree| {
             self.connectSurfaceHandlers(tree);
         }
+        tab.syncBroadcastInputState();
     }
 
     fn tabViewPageDetached(
@@ -1536,6 +1546,7 @@ pub const Window = extern struct {
         if (tab.getSurfaceTree()) |tree| {
             self.disconnectSurfaceHandlers(tree);
         }
+        tab.syncBroadcastInputState();
     }
 
     fn tabViewCreateWindow(
