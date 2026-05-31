@@ -498,7 +498,9 @@ struct VerticalTabSidebar: View {
         syncTabModel()
 
         guard let window = windowController?.window else {
-            tabModel.tabs = []
+            return
+        }
+        guard window.isVisible || window.tabGroup != nil else {
             return
         }
 
