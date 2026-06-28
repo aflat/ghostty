@@ -155,6 +155,19 @@ pub fn parse(parser: *Parser, _: ?u8) ?*Command {
             return &parser.command;
         },
 
+        .SetBadgeFormat => {
+            const value = value_ orelse {
+                parser.command = .invalid;
+                return null;
+            };
+            parser.command = .{
+                .set_badge = .{
+                    .value = value,
+                },
+            };
+            return &parser.command;
+        },
+
         .AddAnnotation,
         .AddHiddenAnnotation,
         .Block,
@@ -180,7 +193,6 @@ pub fn parse(parser: *Parser, _: ?u8) ?*Command {
         .RequestAttention,
         .RequestUpload,
         .SetBackgroundImageFile,
-        .SetBadgeFormat,
         .SetColors,
         .SetKeyLabel,
         .SetMark,
@@ -198,7 +210,7 @@ pub fn parse(parser: *Parser, _: ?u8) ?*Command {
     return &parser.command;
 }
 
-test "OSC: 1337: test valid unimplemented key with no value" {
+test "OSC: 1337: test SetBadgeFormat with no value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -210,7 +222,7 @@ test "OSC: 1337: test valid unimplemented key with no value" {
     try testing.expect(p.end('\x1b') == null);
 }
 
-test "OSC: 1337: test valid unimplemented key with empty value" {
+test "OSC: 1337: test SetBadgeFormat with empty value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -219,10 +231,12 @@ test "OSC: 1337: test valid unimplemented key with empty value" {
     const input = "1337;SetBadgeFormat=";
     for (input) |ch| p.next(ch);
 
-    try testing.expect(p.end('\x1b') == null);
+    const cmd = p.end('\x1b').?;
+    try testing.expect(cmd.* == .set_badge);
+    try testing.expectEqualStrings("", cmd.set_badge.value);
 }
 
-test "OSC: 1337: test valid unimplemented key with non-empty value" {
+test "OSC: 1337: test SetBadgeFormat with non-empty value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -231,10 +245,12 @@ test "OSC: 1337: test valid unimplemented key with non-empty value" {
     const input = "1337;SetBadgeFormat=abc123";
     for (input) |ch| p.next(ch);
 
-    try testing.expect(p.end('\x1b') == null);
+    const cmd = p.end('\x1b').?;
+    try testing.expect(cmd.* == .set_badge);
+    try testing.expectEqualStrings("abc123", cmd.set_badge.value);
 }
 
-test "OSC: 1337: test valid key with lower case and with no value" {
+test "OSC: 1337: test SetBadgeFormat with lower case and no value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -246,7 +262,7 @@ test "OSC: 1337: test valid key with lower case and with no value" {
     try testing.expect(p.end('\x1b') == null);
 }
 
-test "OSC: 1337: test valid key with lower case and with empty value" {
+test "OSC: 1337: test SetBadgeFormat with lower case and empty value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -255,10 +271,12 @@ test "OSC: 1337: test valid key with lower case and with empty value" {
     const input = "1337;setbadgeformat=";
     for (input) |ch| p.next(ch);
 
-    try testing.expect(p.end('\x1b') == null);
+    const cmd = p.end('\x1b').?;
+    try testing.expect(cmd.* == .set_badge);
+    try testing.expectEqualStrings("", cmd.set_badge.value);
 }
 
-test "OSC: 1337: test valid key with lower case and with non-empty value" {
+test "OSC: 1337: test SetBadgeFormat with lower case and non-empty value" {
     const testing = std.testing;
 
     var p: Parser = .init(testing.allocator);
@@ -267,7 +285,9 @@ test "OSC: 1337: test valid key with lower case and with non-empty value" {
     const input = "1337;setbadgeformat=abc123";
     for (input) |ch| p.next(ch);
 
-    try testing.expect(p.end('\x1b') == null);
+    const cmd = p.end('\x1b').?;
+    try testing.expect(cmd.* == .set_badge);
+    try testing.expectEqualStrings("abc123", cmd.set_badge.value);
 }
 
 test "OSC: 1337: test invalid key with no value" {

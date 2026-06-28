@@ -177,6 +177,12 @@ pub const Command = union(Key) {
     /// doing, such as working or waiting on the user, or asks whether the
     /// terminal supports the protocol. See `ProgramStatus`.
     program_status: ProgramStatus,
+    /// Set the surface badge. This is currently parsed from iTerm2's
+    /// OSC 1337 SetBadgeFormat sequence. The value is the raw base64 payload
+    /// and is decoded by the terminal stream.
+    set_badge: struct {
+        value: [:0]const u8,
+    },
 
     pub const SemanticPrompt = parsers.semantic_prompt.Command;
     pub const HierarchicalContext = parsers.hierarchical_context.Command;
@@ -222,6 +228,7 @@ pub const Command = union(Key) {
             "kitty_desktop_notification",
             "unknown",
             "program_status",
+            "set_badge",
         },
     );
 
@@ -556,6 +563,7 @@ pub const Parser = struct {
             .hierarchical_context,
             .unknown,
             .program_status,
+            .set_badge,
             => {},
         }
 
