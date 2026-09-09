@@ -133,8 +133,16 @@ extension Ghostty {
                 return "Unable to read hosts file \(path): \(error.localizedDescription)"
             }
 
+            // Comments are line-based: everything from the first "#" to the end of the
+            // line is ignored. We strip them before splitting on commas so that a
+            // commented out line can't leak entries through its commas.
             let fileHosts = contents
-                .split { $0 == "," || $0 == "\n" || $0 == "\r" }
+                .split { $0 == "\n" || $0 == "\r" }
+                .map { line -> Substring in
+                    guard let comment = line.firstIndex(of: "#") else { return line }
+                    return line[line.startIndex..<comment]
+                }
+                .flatMap { $0.split(separator: ",") }
                 .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             hosts.append(contentsOf: fileHosts)

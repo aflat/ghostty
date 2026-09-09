@@ -55,11 +55,14 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// the model keeps the sidebar stable when switching to a newly created tab.
     private var verticalTabModelStorage: VerticalTabSidebar.TabModel?
 
+    /// This is read from `VerticalTabSidebar.init`, which runs during SwiftUI body
+    /// evaluation, so it must stay cheap and side-effect free with respect to AppKit.
+    /// In particular it must not touch `window.tabGroup`: the first access makes AppKit
+    /// build the window stack controller, which recalculates the key view loop and
+    /// re-enters layout from inside the SwiftUI update, producing a storm of
+    /// "AttributeGraph: cycle detected" warnings. Tab group reconciliation happens in
+    /// `syncVerticalTabModelWithTabGroup()` instead.
     var verticalTabModel: VerticalTabSidebar.TabModel {
-        if let model = sharedVerticalTabModelFromCurrentTabGroup() {
-            return model
-        }
-
         if let model = verticalTabModelStorage {
             return model
         }
@@ -69,12 +72,27 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
            let parentController = parent.windowController as? TerminalController {
             let model = parentController.verticalTabModel
             verticalTabModelStorage = model
-            shareVerticalTabModelWithCurrentTabGroup(model)
             return model
         }
 
         let model = VerticalTabSidebar.TabModel()
         verticalTabModelStorage = model
+        return model
+    }
+
+    /// Reconcile this controller's tab model with the rest of its native tab group and
+    /// return the model the whole group should share.
+    ///
+    /// This touches `window.tabGroup` and mutates observable state, so it must only be
+    /// called from lifecycle points (window/tab notifications, `onAppear`), never from
+    /// a SwiftUI view body or initializer.
+    @discardableResult
+    func syncVerticalTabModelWithTabGroup() -> VerticalTabSidebar.TabModel {
+        let model = verticalTabModel
+        if let shared = sharedVerticalTabModelFromCurrentTabGroup() {
+            return shared
+        }
+
         shareVerticalTabModelWithCurrentTabGroup(model)
         return model
     }
