@@ -602,7 +602,8 @@ struct VerticalTabSidebar: View {
     }
 
     private func syncTabModel() {
-        guard let sharedModel = (windowController as? TerminalController)?.verticalTabModel,
+        guard let sharedModel = (windowController as? TerminalController)?
+                .syncVerticalTabModelWithTabGroup(),
               sharedModel !== tabModel
         else { return }
 
