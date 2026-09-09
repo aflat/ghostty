@@ -426,6 +426,7 @@ struct VerticalTabSidebar: View {
         let onClearCustomTitle: () -> Void
 
         @State private var isHovering: Bool = false
+        @State private var isHoveringClose: Bool = false
 
         private var backgroundFill: Color {
             if let c = color {
@@ -471,15 +472,26 @@ struct VerticalTabSidebar: View {
                 if isHovering {
                     Button(action: onClose) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
+                            .frame(width: 20)
+                            .frame(maxHeight: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.primary.opacity(isHoveringClose ? 0.15 : 0))
+                            )
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Close Tab")
+                    .onHover { hovering in
+                        isHoveringClose = hovering
+                    }
                 }
             }
+            .frame(minHeight: 24)
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 2)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(backgroundFill)
