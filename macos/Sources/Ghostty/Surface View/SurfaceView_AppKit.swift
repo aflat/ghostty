@@ -428,6 +428,14 @@ extension Ghostty {
             // sent to stop things like mouse selection.
             if !focused {
                 suppressLeftMouseUntilRelease = false
+
+                // A bell that rang while we were focused was rung in front of
+                // the user. Regaining focus only clears the bell on a real
+                // unfocused-to-focused transition and a key press only clears
+                // it if one follows the bell, so without this the bell (and
+                // the tab outline and title marker that follow it) would stay
+                // up after the user leaves for another tab or split.
+                bell = false
             }
 
             // Notify libghostty
