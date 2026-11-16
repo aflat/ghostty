@@ -11,9 +11,10 @@ usage() {
   cat <<'EOF'
 Usage: ghostty-ctl COMMAND [-t TERMINAL] [ARGS]
 
-Commands:
+Terminals:
   whoami                     Print the ID of the terminal this runs in
-  list                       List terminals: ID, activity, badge, directory, title
+  list [--json]              List terminals: ID, activity, badge, directory,
+                             title; --json adds each one's tab and window
   split [DIR] [-- CMD...]    Split a terminal (right, left, down, up; default
                              right) and print the new terminal's ID
   send TEXT                  Type TEXT into a terminal, as if pasted
@@ -23,9 +24,36 @@ Commands:
                              scrollback too
   badge [TEXT]               Print the badge, or set it; "" clears it
   activity                   Print idle, working, done, error, or blocked
+  wait [--timeout SECS] [STATE...]
+                             Wait until the activity is one of STATE (default
+                             done, error, or blocked), then print it; exits
+                             with status 124 when SECS pass first
   broadcast [on|off]         Print or set broadcast input for the terminal's tab
-  focus                      Focus a terminal and bring its window forward
   close                      Close a terminal
+
+Layout:
+  focus [DIR]                Focus a terminal and bring its window forward, or
+                             with DIR focus its neighbor: left, right, up,
+                             down, previous, or next
+  zoom                       Zoom a split to fill its tab, or restore it
+  resize DIR [PIXELS]        Move a split's divider left, right, up, or down
+                             (default 10 pixels)
+  equalize                   Make the splits in a terminal's tab the same size
+  action ACTION              Perform any Ghostty keybind action on a terminal,
+                             such as scroll_to_bottom or increase_font_size:2
+
+Tabs and windows (of the terminal chosen with -t):
+  tab list                   List tabs: window ID, tab ID, index, selected, title
+  tab new [-- CMD...]        Open a tab in the terminal's window and print the
+                             new terminal's ID
+  tab select                 Show the terminal's tab
+  tab rename [NAME]          Print the tab's title, or set it; "" restores it
+  tab move OFFSET            Move the tab OFFSET places; -1 is one to the left
+  tab close                  Close the terminal's tab
+  window list                List windows: window ID, title
+  window new [-- CMD...]     Open a window and print the new terminal's ID
+  window close               Close the terminal's window
+
   guide                      Print the guide for agents
 
 Options:
@@ -100,9 +128,70 @@ end run
 EOF
 }
 
+# Runs a JavaScript for Automation script against the app, for output that
+# has to be JSON. The script body sees `app` and `argv`.
+run_js() {
+  local body="$1"
+  shift
+  osascript -l JavaScript - "$app" "$@" <<EOF
+function run(argv) {
+  const target = argv.shift();
+  const app = Application(target);
+  $body
+}
+EOF
+}
+
+# AppleScript that sets foundTab and foundWindow to the tab and window that
+# hold the terminal named by item 1 of argv. A terminal doesn't know its tab,
+# so this looks through every tab for it.
+find_tab='
+      set t to my findTerminal(item 1 of argv)
+      set wanted to id of t
+      set foundTab to missing value
+      set foundWindow to missing value
+      repeat with w in windows
+        repeat with b in tabs of w
+          repeat with other in terminals of b
+            if id of other is wanted then
+              set foundTab to contents of b
+              set foundWindow to contents of w
+            end if
+          end repeat
+        end repeat
+      end repeat
+      if foundTab is missing value then error "the terminal is not in a tab"'
+
+# Performs a Ghostty keybind action on the target terminal.
+perform() {
+  run '
+      set t to my findTerminal(item 1 of argv)
+      if not (perform action (item 2 of argv) on t) then error "Ghostty did not perform the action " & (item 2 of argv)' "$target" "$1" >/dev/null
+}
+
+# Prints the words after "--" quoted as one shell command, or nothing when
+# there are no arguments.
+command_after_dashes() {
+  [[ $# -ge 1 ]] || return 0
+  [[ "$1" == "--" ]] || die "unexpected argument \"$1\"; put a command after --"
+  shift
+  [[ $# -ge 1 ]] || die "no command after --"
+  printf '%q ' "$@"
+}
+
 [[ $# -ge 1 ]] || { usage >&2; exit 2; }
 command="$1"
 shift
+
+# tab and window take a subcommand, which comes before -t.
+sub=""
+case "$command" in
+  tab | window)
+    [[ $# -ge 1 ]] || die "$command needs a subcommand; see ghostty-ctl help"
+    sub="$1"
+    shift
+    ;;
+esac
 
 target=""
 if [[ "${1:-}" == "-t" ]]; then
@@ -124,10 +213,42 @@ case "$command" in
     ;;
 
   list)
+    if [[ "${1:-}" == "--json" ]]; then
+      run_js '
+  const out = [];
+  for (const w of app.windows()) {
+    for (const b of w.tabs()) {
+      for (const t of b.terminals()) {
+        out.push({
+          id: t.id(),
+          surface_id: t.surfaceId(),
+          activity: t.activity(),
+          badge: t.badge(),
+          working_directory: t.workingDirectory(),
+          title: t.name(),
+          focused_in_tab: b.focusedTerminal().id() === t.id(),
+          tab: {
+            id: b.id(),
+            index: b.index(),
+            title: b.name(),
+            selected: b.selected(),
+            broadcasting: b.broadcasting(),
+          },
+          window: { id: w.id(), title: w.name() },
+        });
+      }
+    }
+  }
+  return JSON.stringify(out, null, 2);'
+      exit 0
+    fi
+    [[ $# -eq 0 ]] || die "list takes only --json"
     run '
+      -- Inside this tell block the word tab is the tab class, not the character.
+      set sep to character id 9
       set out to ""
       repeat with t in terminals
-        set out to out & (id of t) & tab & (activity of t) & tab & (badge of t) & tab & (working directory of t) & tab & (name of t) & linefeed
+        set out to out & (id of t) & sep & (activity of t) & sep & (badge of t) & sep & (working directory of t) & sep & (name of t) & linefeed
       end repeat
       return out' | sed '/^$/d'
     ;;
@@ -197,39 +318,178 @@ case "$command" in
     run 'return activity of my findTerminal(item 1 of argv)' "$target"
     ;;
 
+  wait)
+    need_target
+    timeout=""
+    if [[ "${1:-}" == "--timeout" ]]; then
+      [[ "${2:-}" =~ ^[0-9]+$ ]] || die "--timeout needs a number of seconds"
+      timeout="$2"
+      shift 2
+    fi
+    [[ $# -ge 1 ]] || set -- "done" error blocked
+    for state in "$@"; do
+      case "$state" in
+        idle | working | done | error | blocked) ;;
+        *) die "unknown activity \"$state\"; use idle, working, done, error, or blocked" ;;
+      esac
+    done
+    SECONDS=0
+    while true; do
+      now="$(run 'return activity of my findTerminal(item 1 of argv)' "$target")"
+      for state in "$@"; do
+        if [[ "$now" == "$state" ]]; then
+          echo "$now"
+          exit 0
+        fi
+      done
+      if [[ -n "$timeout" && $SECONDS -ge $timeout ]]; then
+        echo "ghostty-ctl: timed out after ${timeout}s; the activity is $now" >&2
+        exit 124
+      fi
+      sleep 0.5
+    done
+    ;;
+
   broadcast)
     need_target
-    # A terminal doesn't know its tab, so look for the tab that holds it.
-    find_tab='
-      set t to my findTerminal(item 1 of argv)
-      set wanted to id of t
-      set found to missing value
-      repeat with w in windows
-        repeat with b in tabs of w
-          repeat with other in terminals of b
-            if id of other is wanted then set found to b
-          end repeat
-        end repeat
-      end repeat
-      if found is missing value then error "the terminal is not in a tab"'
     case "${1:-}" in
       "") run "$find_tab
-      if broadcasting of found then
+      if broadcasting of foundTab then
         return \"on\"
       else
         return \"off\"
       end if" "$target" ;;
       on) run "$find_tab
-      set broadcasting of found to true" "$target" ;;
+      set broadcasting of foundTab to true" "$target" ;;
       off) run "$find_tab
-      set broadcasting of found to false" "$target" ;;
+      set broadcasting of foundTab to false" "$target" ;;
       *) die "broadcast takes on or off" ;;
     esac
     ;;
 
   focus)
     need_target
-    run 'focus (my findTerminal(item 1 of argv))' "$target"
+    case "${1:-}" in
+      "") run 'focus (my findTerminal(item 1 of argv))' "$target" ;;
+      left | right | up | down | previous | next) perform "goto_split:$1" ;;
+      *) die "unknown direction \"$1\"; use left, right, up, down, previous, or next" ;;
+    esac
+    ;;
+
+  zoom)
+    need_target
+    perform toggle_split_zoom
+    ;;
+
+  resize)
+    need_target
+    [[ $# -ge 1 && $# -le 2 ]] || die "resize takes a direction and optional pixels"
+    case "$1" in
+      left | right | up | down) ;;
+      *) die "unknown direction \"$1\"; use left, right, up, or down" ;;
+    esac
+    pixels="${2:-10}"
+    [[ "$pixels" =~ ^[0-9]+$ ]] || die "pixels must be a whole number"
+    perform "resize_split:$1,$pixels"
+    ;;
+
+  equalize)
+    need_target
+    perform equalize_splits
+    ;;
+
+  action)
+    need_target
+    [[ $# -eq 1 ]] || die "action takes one argument, the action string"
+    perform "$1"
+    ;;
+
+  tab)
+    case "$sub" in
+      list)
+        run '
+      -- Inside this tell block the word tab is the tab class, not the character.
+      set sep to character id 9
+      set out to ""
+      repeat with w in windows
+        repeat with b in tabs of w
+          set out to out & (id of w) & sep & (id of b) & sep & (index of b) & sep & (selected of b) & sep & (name of b) & linefeed
+        end repeat
+      end repeat
+      return out' | sed '/^$/d'
+        ;;
+      new)
+        cmd="$(command_after_dashes "$@")"
+        # Outside Ghostty there is no terminal whose window to use, so the
+        # app picks the window.
+        if [[ -n "$target" ]]; then
+          run "$find_tab
+      set cfg to new surface configuration
+      if (item 2 of argv) is not \"\" then set command of cfg to (item 2 of argv)
+      return id of focused terminal of (new tab in foundWindow with configuration cfg)" "$target" "$cmd"
+        else
+          run '
+      set cfg to new surface configuration
+      if (item 1 of argv) is not "" then set command of cfg to (item 1 of argv)
+      return id of focused terminal of (new tab with configuration cfg)' "$cmd"
+        fi
+        ;;
+      select)
+        need_target
+        run "$find_tab
+      select tab foundTab" "$target"
+        ;;
+      rename)
+        need_target
+        if [[ $# -eq 0 ]]; then
+          run "$find_tab
+      return name of foundTab" "$target"
+        else
+          run "$find_tab
+      set name override of foundTab to (item 2 of argv)" "$target" "$1"
+        fi
+        ;;
+      move)
+        need_target
+        [[ "${1:-}" =~ ^-?[0-9]+$ ]] || die "tab move takes an offset, such as 1 or -1"
+        perform "move_tab:$1"
+        ;;
+      close)
+        need_target
+        run "$find_tab
+      close tab foundTab" "$target"
+        ;;
+      *) die "unknown tab subcommand \"$sub\"; use list, new, select, rename, move, or close" ;;
+    esac
+    ;;
+
+  window)
+    case "$sub" in
+      list)
+        run '
+      -- Inside this tell block the word tab is the tab class, not the character.
+      set sep to character id 9
+      set out to ""
+      repeat with w in windows
+        set out to out & (id of w) & sep & (name of w) & linefeed
+      end repeat
+      return out' | sed '/^$/d'
+        ;;
+      new)
+        cmd="$(command_after_dashes "$@")"
+        run '
+      set cfg to new surface configuration
+      if (item 1 of argv) is not "" then set command of cfg to (item 1 of argv)
+      set w to new window with configuration cfg
+      return id of focused terminal of selected tab of w' "$cmd"
+        ;;
+      close)
+        need_target
+        run "$find_tab
+      close window foundWindow" "$target"
+        ;;
+      *) die "unknown window subcommand \"$sub\"; use list, new, or close" ;;
+    esac
     ;;
 
   close)

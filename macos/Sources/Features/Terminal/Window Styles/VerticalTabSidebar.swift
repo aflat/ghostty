@@ -17,6 +17,9 @@ struct VerticalTabSidebar: View {
     /// Whether tab rows show their keyboard shortcut, such as ⌘1.
     var shortcutLabelEnabled: Bool = true
 
+    /// Whether tab rows with a title the user set show a pencil icon.
+    var customTitleIndicatorEnabled: Bool = true
+
     /// Outline color for tab rows that are ringing the bell.
     var bellOutlineColor: Color = .orange
 
@@ -57,6 +60,7 @@ struct VerticalTabSidebar: View {
         bellOutlineColor: Color = .orange,
         bellOutlineWidth: CGFloat = 2,
         shortcutLabelEnabled: Bool = true,
+        customTitleIndicatorEnabled: Bool = true,
         windowController: BaseTerminalController?,
         isRightSide: Bool = false
     ) {
@@ -66,6 +70,7 @@ struct VerticalTabSidebar: View {
         self.bellOutlineColor = bellOutlineColor
         self.bellOutlineWidth = bellOutlineWidth
         self.shortcutLabelEnabled = shortcutLabelEnabled
+        self.customTitleIndicatorEnabled = customTitleIndicatorEnabled
         self.windowController = windowController
         self.isRightSide = isRightSide
         self._tabModel = ObservedObject(
@@ -91,6 +96,7 @@ struct VerticalTabSidebar: View {
                                 isSelected: tab.isSelected,
                                 keyEquivalent: shortcutLabelEnabled && tab.index < 9 ? "\(tab.index + 1)" : nil,
                                 hasCustomTitle: tab.hasCustomTitle,
+                                showCustomTitleIndicator: customTitleIndicatorEnabled,
                                 color: tabColorEnabled ? tab.color : nil,
                                 selectedBorderColor: selectedBorderColor,
                                 hasBell: bellOutlineEnabled && tab.hasBell,
@@ -502,6 +508,7 @@ struct VerticalTabSidebar: View {
         let isSelected: Bool
         let keyEquivalent: String?
         let hasCustomTitle: Bool
+        var showCustomTitleIndicator: Bool = true
         let color: Color?
         let selectedBorderColor: Color
         let hasBell: Bool
@@ -548,7 +555,7 @@ struct VerticalTabSidebar: View {
                 }
 
                 // Custom title indicator
-                if hasCustomTitle {
+                if hasCustomTitle && showCustomTitleIndicator {
                     Image(systemName: "pencil.circle.fill")
                         .font(.system(size: 10))
                         .foregroundColor(.accentColor.opacity(0.7))
