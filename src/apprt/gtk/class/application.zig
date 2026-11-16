@@ -819,6 +819,7 @@ pub const Application = extern struct {
             .toggle_background_opacity,
             .set_badge,
             .prompt_badge,
+            .program_status,
             .render_inspector,
             .renderer_health,
             .color_change,

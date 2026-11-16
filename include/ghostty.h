@@ -743,6 +743,11 @@ typedef struct {
   const char* badge;
 } ghostty_action_set_badge_s;
 
+// apprt.action.ProgramStatus.C
+typedef struct {
+  const char* report;
+} ghostty_action_program_status_s;
+
 // apprt.action.PromptTitle
 typedef enum {
   GHOSTTY_PROMPT_TITLE_SURFACE,
@@ -1021,6 +1026,7 @@ typedef enum {
   GHOSTTY_ACTION_PROMPT_TITLE,
   GHOSTTY_ACTION_SET_BADGE,
   GHOSTTY_ACTION_PROMPT_BADGE,
+  GHOSTTY_ACTION_PROGRAM_STATUS,
   GHOSTTY_ACTION_PWD,
   GHOSTTY_ACTION_MOUSE_SHAPE,
   GHOSTTY_ACTION_MOUSE_VISIBILITY,
@@ -1078,6 +1084,7 @@ typedef union {
   ghostty_action_set_title_s set_tab_title;
   ghostty_action_prompt_title_e prompt_title;
   ghostty_action_set_badge_s set_badge;
+  ghostty_action_program_status_s program_status;
   ghostty_action_pwd_s pwd;
   ghostty_action_mouse_shape_e mouse_shape;
   ghostty_action_mouse_visibility_e mouse_visibility;
@@ -1241,6 +1248,7 @@ GHOSTTY_API void ghostty_surface_set_occlusion(ghostty_surface_t, bool);
 GHOSTTY_API void ghostty_surface_set_broadcast_input(ghostty_surface_t, bool);
 GHOSTTY_API void ghostty_surface_set_size(ghostty_surface_t, uint32_t, uint32_t);
 GHOSTTY_API ghostty_surface_size_s ghostty_surface_size(ghostty_surface_t);
+GHOSTTY_API uint64_t ghostty_surface_id(ghostty_surface_t);
 GHOSTTY_API uint64_t ghostty_surface_foreground_pid(ghostty_surface_t);
 GHOSTTY_API ghostty_string_s ghostty_surface_pwd(ghostty_surface_t);
 GHOSTTY_API ghostty_string_s ghostty_surface_tty_name(ghostty_surface_t);

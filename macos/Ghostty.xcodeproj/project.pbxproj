@@ -25,6 +25,8 @@
 		A5B30539299BEAAB0047F10C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5B30538299BEAAB0047F10C /* Assets.xcassets */; };
 		FC5218FA2D10FFCE004C93E0 /* zsh in Resources */ = {isa = PBXBuildFile; fileRef = FC5218F92D10FFC7004C93E0 /* zsh */; };
 		FC9ABA9C2D0F53F80020D4C8 /* bash-completion in Resources */ = {isa = PBXBuildFile; fileRef = FC9ABA9B2D0F538D0020D4C8 /* bash-completion */; };
+		C7A0000100000000000C7103 /* ghostty-ctl in Resources */ = {isa = PBXBuildFile; fileRef = C7A0000100000000000C7101 /* ghostty-ctl */; };
+		C7A0000100000000000C7104 /* ghostty-ctl.md in Resources */ = {isa = PBXBuildFile; fileRef = C7A0000100000000000C7102 /* ghostty-ctl.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +75,8 @@
 		810ACC9F2E9D3301004F8F92 /* GhosttyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GhosttyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8193244D2F24E6C000A9ED8F /* DockTilePlugin.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockTilePlugin.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F3A9B4B2FA6B88000A18D13 /* Ghostty.sdef */ = {isa = PBXFileReference; lastKnownFileType = text.sdef; path = Ghostty.sdef; sourceTree = "<group>"; };
+		C7A0000100000000000C7101 /* ghostty-ctl */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = "ghostty-ctl"; path = "Tools/ghostty-ctl"; sourceTree = "<group>"; };
+		C7A0000100000000000C7102 /* ghostty-ctl.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = "ghostty-ctl.md"; path = "Tools/ghostty-ctl.md"; sourceTree = "<group>"; };
 		9351BE8E2D22937F003B3499 /* nvim */ = {isa = PBXFileReference; lastKnownFileType = folder; name = nvim; path = "../zig-out/share/nvim"; sourceTree = "<group>"; };
 		A51BFC282B30F26D00E92F16 /* GhosttyDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GhosttyDebug.entitlements; sourceTree = "<group>"; };
 		A546F1132D7B68D7003B11A0 /* locale */ = {isa = PBXFileReference; lastKnownFileType = folder; name = locale; path = "../zig-out/share/locale"; sourceTree = "<group>"; };
@@ -180,6 +184,8 @@
 			children = (
 				A571AB1C2A206FC600248498 /* Ghostty-Info.plist */,
 				8F3A9B4B2FA6B88000A18D13 /* Ghostty.sdef */,
+				C7A0000100000000000C7101 /* ghostty-ctl */,
+				C7A0000100000000000C7102 /* ghostty-ctl.md */,
 				A5B30538299BEAAB0047F10C /* Assets.xcassets */,
 				A553F4122E06EB1600257779 /* Ghostty.icon */,
 				A5B3053D299BEAAB0047F10C /* Ghostty.entitlements */,
@@ -291,6 +297,7 @@
 				A5B3052E299BEAAA0047F10C /* Frameworks */,
 				A5B3052F299BEAAA0047F10C /* Resources */,
 				819324572F24E74E00A9ED8F /* Copy DockTilePlugin */,
+				C7A0000100000000000C7105 /* Link CLI Tools */,
 			);
 			buildRules = (
 			);
@@ -391,6 +398,8 @@
 				29C15B1D2CDC3B2900520DD4 /* bat in Resources */,
 				A586167C2B7703CC009BDB1D /* fish in Resources */,
 				8F3A9B4C2FA6B88000A18D13 /* Ghostty.sdef in Resources */,
+				C7A0000100000000000C7103 /* ghostty-ctl in Resources */,
+				C7A0000100000000000C7104 /* ghostty-ctl.md in Resources */,
 				55154BE02B33911F001622DC /* ghostty in Resources */,
 				A546F1142D7B68D7003B11A0 /* locale in Resources */,
 				A5985CE62C33060F00C57AD3 /* man in Resources */,
@@ -423,6 +432,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "[[ -z \"$GITHUB_ACTIONS\" ]] || exit 0;\n\nSWIFTLINT=\"\"\nif command -v swiftlint >/dev/null 2>&1; then\n    SWIFTLINT=\"$(command -v swiftlint)\"\nelif [[ -f \"/opt/homebrew/bin/swiftlint\" ]]; then\n    SWIFTLINT=\"/opt/homebrew/bin/swiftlint\"\nfi\n\nif [[ -n \"$SWIFTLINT\" ]]; then\n    \"$SWIFTLINT\" lint --quiet\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		C7A0000100000000000C7105 /* Link CLI Tools */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Tools/ghostty-ctl",
+			);
+			name = "Link CLI Tools";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(EXECUTABLE_FOLDER_PATH)/ghostty-ctl",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# ghostty-ctl is a shell script, which can't be signed as code, so it lives\n# in Resources. This link puts it beside the ghostty binary, the directory\n# Ghostty adds to the PATH of the shells it starts.\nln -sf ../Resources/ghostty-ctl \"$BUILT_PRODUCTS_DIR/$EXECUTABLE_FOLDER_PATH/ghostty-ctl\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

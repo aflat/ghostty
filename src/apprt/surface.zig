@@ -137,6 +137,10 @@ pub const Message = union(enum) {
     /// Set or clear the surface badge.
     set_badge: WriteReq,
 
+    /// A program status report (OSC 7501), or one of the events in
+    /// apprt.action.ProgramStatus.
+    program_status: WriteReq,
+
     /// The terminal encountered a bell character.
     ring_bell,
 

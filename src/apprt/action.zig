@@ -223,6 +223,10 @@ pub const Action = union(Key) {
     /// prompt.
     prompt_badge,
 
+    /// A program in the target surface reported its status (OSC 7501), or
+    /// an event ended the reports it made earlier.
+    program_status: ProgramStatus,
+
     /// The current working directory has changed for the target terminal.
     pwd: Pwd,
 
@@ -418,6 +422,7 @@ pub const Action = union(Key) {
         prompt_title,
         set_badge,
         prompt_badge,
+        program_status,
         pwd,
         mouse_shape,
         mouse_visibility,
@@ -925,6 +930,32 @@ pub const KeyTable = union(enum) {
                 .tag = .deactivate_all,
                 .value = undefined,
             },
+        };
+    }
+};
+
+pub const ProgramStatus = struct {
+    /// A validated report with one `key=value` per line, as written by
+    /// termio.StreamHandler.programStatus, or one of the events below.
+    /// Events never come from a program: a report always starts with
+    /// `state=`.
+    report: [:0]const u8,
+
+    /// A new shell prompt began. Working and blocked reports no longer hold.
+    pub const event_prompt: [:0]const u8 = "event=prompt";
+
+    /// The surface's process exited. Working and blocked reports no longer
+    /// hold.
+    pub const event_exit: [:0]const u8 = "event=exit";
+
+    // Sync with: ghostty_action_program_status_s
+    pub const C = extern struct {
+        report: [*:0]const u8,
+    };
+
+    pub fn cval(self: ProgramStatus) C {
+        return .{
+            .report = self.report.ptr,
         };
     }
 };

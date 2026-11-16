@@ -3545,6 +3545,16 @@ keybind: Keybinds = .{},
 /// The default value is a fluorescent green.
 @"macos-tab-border-color": Color = .{ .r = 0x39, .g = 0xFF, .b = 0x14 },
 
+/// Whether to show each tab's keyboard shortcut (such as `⌘1`) beside its
+/// title in the vertical tab sidebar. The shortcuts keep working when the
+/// labels are hidden.
+///
+/// This option only has an effect when `macos-tabs-location` is set to
+/// `left` or `right`.
+///
+/// The default value is `true`.
+@"macos-tab-shortcut-label": bool = true,
+
 /// Whether to outline tabs in the vertical tab sidebar that are ringing
 /// the bell (for example, a program such as an AI coding agent prompting
 /// for input while its tab isn't focused). This makes it easy to spot,

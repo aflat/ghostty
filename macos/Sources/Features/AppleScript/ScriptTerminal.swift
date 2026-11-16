@@ -1,4 +1,5 @@
 import AppKit
+import GhosttyKit
 
 /// AppleScript-facing wrapper around a live Ghostty terminal surface.
 ///
@@ -14,6 +15,11 @@ import AppKit
 /// - `property working directory` -> `@objc(workingDirectory)` getter below.
 /// - `property pid` -> `@objc(pid)` getter below.
 /// - `property tty` -> `@objc(tty)` getter below.
+/// - `property visible text` -> `@objc(visibleText)` getter below.
+/// - `property full text` -> `@objc(fullText)` getter below.
+/// - `property badge` -> `@objc(badge)` getter and setter below.
+/// - `property surface id` -> `@objc(surfaceID)` getter below.
+/// - `property activity` -> `@objc(activity)` getter below.
 ///
 /// We keep only a weak reference to the underlying `SurfaceView` so this
 /// wrapper never extends the terminal's lifetime.
@@ -84,6 +90,66 @@ final class ScriptTerminal: NSObject {
     var tty: String {
         guard NSApp.isAppleScriptEnabled else { return "" }
         return surfaceView?.surfaceModel?.ttyName ?? ""
+    }
+
+    /// Exposed as the AppleScript `visible text` property.
+    ///
+    /// The text currently visible in the terminal. This reads the terminal
+    /// directly, so a script sees the result of input it just sent as soon as
+    /// the program has printed it. It isn't named `contents` because
+    /// AppleScript uses that word to dereference a reference.
+    @objc(visibleText)
+    var visibleText: String {
+        guard NSApp.isAppleScriptEnabled else { return "" }
+        return surfaceView?.readText(in: GHOSTTY_POINT_VIEWPORT) ?? ""
+    }
+
+    /// Exposed as the AppleScript `full text` property.
+    ///
+    /// The scrollback followed by the visible screen.
+    @objc(fullText)
+    var fullText: String {
+        guard NSApp.isAppleScriptEnabled else { return "" }
+        return surfaceView?.readText(in: GHOSTTY_POINT_SCREEN) ?? ""
+    }
+
+    /// Exposed as the AppleScript `badge` property.
+    ///
+    /// Setting an empty string clears the badge.
+    @objc(badge)
+    var badge: String {
+        get {
+            guard NSApp.isAppleScriptEnabled else { return "" }
+            return surfaceView?.badge ?? ""
+        }
+        set {
+            guard NSApp.isAppleScriptEnabled else { return }
+            surfaceView?.setBadge(newValue)
+        }
+    }
+
+    /// Exposed as the AppleScript `surface id` property.
+    ///
+    /// The value programs running in this terminal see as `GHOSTTY_SURFACE_ID`,
+    /// which lets a program find the terminal it is running in.
+    @objc(surfaceID)
+    var surfaceID: String {
+        guard NSApp.isAppleScriptEnabled else { return "" }
+        return surfaceView?.surfaceModel?.surfaceID ?? ""
+    }
+
+    /// Exposed as the AppleScript `activity` property.
+    ///
+    /// One of `idle`, `working`, `done`, `error`, or `blocked`, from the
+    /// status and progress the terminal's programs last reported.
+    @objc(activity)
+    var activity: String {
+        guard NSApp.isAppleScriptEnabled else { return "" }
+        guard let surfaceView else { return TerminalActivity.idle.rawValue }
+        return TerminalActivity(
+            progress: surfaceView.progressReport,
+            status: surfaceView.programStatus
+        ).rawValue
     }
 
     /// Used by command handling (`perform action ... on <terminal>`).

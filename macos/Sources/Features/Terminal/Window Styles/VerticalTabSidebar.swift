@@ -14,6 +14,9 @@ struct VerticalTabSidebar: View {
     /// AI coding agent waiting for input).
     var bellOutlineEnabled: Bool = true
 
+    /// Whether tab rows show their keyboard shortcut, such as ⌘1.
+    var shortcutLabelEnabled: Bool = true
+
     /// Outline color for tab rows that are ringing the bell.
     var bellOutlineColor: Color = .orange
 
@@ -53,6 +56,7 @@ struct VerticalTabSidebar: View {
         bellOutlineEnabled: Bool = true,
         bellOutlineColor: Color = .orange,
         bellOutlineWidth: CGFloat = 2,
+        shortcutLabelEnabled: Bool = true,
         windowController: BaseTerminalController?,
         isRightSide: Bool = false
     ) {
@@ -61,6 +65,7 @@ struct VerticalTabSidebar: View {
         self.bellOutlineEnabled = bellOutlineEnabled
         self.bellOutlineColor = bellOutlineColor
         self.bellOutlineWidth = bellOutlineWidth
+        self.shortcutLabelEnabled = shortcutLabelEnabled
         self.windowController = windowController
         self.isRightSide = isRightSide
         self._tabModel = ObservedObject(
@@ -84,11 +89,12 @@ struct VerticalTabSidebar: View {
                             TabRow(
                                 title: tab.title,
                                 isSelected: tab.isSelected,
-                                keyEquivalent: tab.index < 9 ? "\(tab.index + 1)" : nil,
+                                keyEquivalent: shortcutLabelEnabled && tab.index < 9 ? "\(tab.index + 1)" : nil,
                                 hasCustomTitle: tab.hasCustomTitle,
                                 color: tabColorEnabled ? tab.color : nil,
                                 selectedBorderColor: selectedBorderColor,
                                 hasBell: bellOutlineEnabled && tab.hasBell,
+                                activity: tab.activity,
                                 bellOutlineColor: bellOutlineColor,
                                 bellOutlineWidth: bellOutlineWidth,
                                 onSelect: {
@@ -157,6 +163,9 @@ struct VerticalTabSidebar: View {
             refreshTabs()
         }
         .onReceive(NotificationCenter.default.publisher(for: .terminalWindowBellDidChangeNotification)) { _ in
+            refreshTabs()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .terminalWindowActivityDidChangeNotification)) { _ in
             refreshTabs()
         }
         .sheet(isPresented: $isShowingRenameDialog) {
@@ -283,6 +292,7 @@ struct VerticalTabSidebar: View {
         let customTabColor: TerminalTabColor
         let hasCustomTitle: Bool
         let hasBell: Bool
+        let activity: TerminalActivity
 
         init(
             window: NSWindow,
@@ -307,6 +317,7 @@ struct VerticalTabSidebar: View {
             self.hasCustomTitle = self.titleOverride != nil
             self.title = self.titleOverride ?? resolvedTitle
             self.hasBell = controller?.bell ?? false
+            self.activity = controller?.activity ?? .idle
         }
     }
 
@@ -410,6 +421,82 @@ struct VerticalTabSidebar: View {
         }
     }
 
+    /// The status of a tab's programs, drawn as a white glyph on a solid
+    /// colored disc so it reads against any tab color.
+    struct ActivityIcon: View {
+        let activity: TerminalActivity
+
+        private var symbol: String {
+            switch activity {
+            case .idle: "circle"
+            case .working: "arrow.triangle.2.circlepath.circle.fill"
+            case .blocked: "hand.raised.circle.fill"
+            case .done: "checkmark.circle.fill"
+            case .error: "exclamationmark.circle.fill"
+            }
+        }
+
+        private var tint: Color {
+            switch activity {
+            case .idle: .secondary
+            case .working: Color(red: 0.0, green: 0.48, blue: 1.0)
+            case .blocked: Color(red: 0.90, green: 0.38, blue: 0.0)
+            case .done: Color(red: 0.10, green: 0.60, blue: 0.25)
+            case .error: Color(red: 0.85, green: 0.10, blue: 0.15)
+            }
+        }
+
+        private var label: String {
+            switch activity {
+            case .idle: ""
+            case .working: "Working"
+            case .blocked: "Waiting for you"
+            case .done: "Finished"
+            case .error: "Reported an error"
+            }
+        }
+
+        private var glyph: some View {
+            Image(systemName: symbol)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, tint)
+                .font(.system(size: 15, weight: .semibold))
+        }
+
+        var body: some View {
+            Group {
+                // Only the working glyph turns. It is a separate view so its
+                // repeating animation ends with it, instead of carrying over
+                // to the glyph that replaces it.
+                if activity == .working {
+                    Spinning { glyph }
+                } else {
+                    glyph
+                }
+            }
+            .frame(width: 18, height: 18)
+            .help(label)
+            .accessibilityLabel(label)
+        }
+
+        /// Rotates its content for as long as it is on screen.
+        private struct Spinning<Content: View>: View {
+            @ViewBuilder let content: () -> Content
+
+            @State private var isSpinning = false
+
+            var body: some View {
+                content()
+                    .rotationEffect(.degrees(isSpinning ? 360 : 0))
+                    .animation(
+                        .linear(duration: 1.4).repeatForever(autoreverses: false),
+                        value: isSpinning
+                    )
+                    .onAppear { isSpinning = true }
+            }
+        }
+    }
+
     struct TabRow: View {
         let title: String
         let isSelected: Bool
@@ -418,6 +505,7 @@ struct VerticalTabSidebar: View {
         let color: Color?
         let selectedBorderColor: Color
         let hasBell: Bool
+        var activity: TerminalActivity = .idle
         let bellOutlineColor: Color
         let bellOutlineWidth: CGFloat
         let onSelect: () -> Void
@@ -444,6 +532,13 @@ struct VerticalTabSidebar: View {
 
         var body: some View {
             HStack(spacing: 6) {
+                // Activity reported by the tab's programs, such as a working
+                // agent. It leads the row so it stays put when the close
+                // button appears on hover.
+                if activity != .idle {
+                    ActivityIcon(activity: activity)
+                }
+
                 // Key equivalent badge
                 if let keyEquiv = keyEquivalent {
                     Text("⌘\(keyEquiv)")
@@ -593,7 +688,8 @@ struct VerticalTabSidebar: View {
                 new.hasCustomTitle != old.hasCustomTitle ||
                 new.customTabColor != old.customTabColor ||
                 new.colorIndex != old.colorIndex ||
-                new.hasBell != old.hasBell
+                new.hasBell != old.hasBell ||
+                new.activity != old.activity
             }
 
         if changed {

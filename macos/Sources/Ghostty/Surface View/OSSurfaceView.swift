@@ -52,6 +52,10 @@ extension Ghostty {
         /// True when this surface is part of the active broadcast input group.
         @Published private(set) var broadcastInput: Bool = false
 
+        /// What the programs in this surface report they are doing, from
+        /// the Program Status Protocol (OSC 7501).
+        @Published private(set) var programStatus: ProgramStatusRecords = .init()
+
         /// User-provided badge shown over this surface.
         @Published private(set) var badge: String?
 
@@ -116,6 +120,24 @@ extension Ghostty {
 
             guard broadcastInput != enabled else { return }
             broadcastInput = enabled
+        }
+
+        /// Applies a program status report from libghostty.
+        func applyProgramStatus(report: String) {
+            var updated = programStatus
+            updated.apply(report: report)
+            guard updated != programStatus else { return }
+            programStatus = updated
+        }
+
+        /// Drops the done and error records once the user is back at this
+        /// surface, since they have now seen them.
+        func acknowledgeProgramStatus() {
+            guard !programStatus.isEmpty else { return }
+            var updated = programStatus
+            updated.acknowledge()
+            guard updated != programStatus else { return }
+            programStatus = updated
         }
 
         func setBadge(_ value: String?) {

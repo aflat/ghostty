@@ -97,6 +97,22 @@ final class ScriptTab: NSObject {
         return ScriptTerminal(surfaceView: surface)
     }
 
+    /// Exposed as the AppleScript `broadcasting` property.
+    ///
+    /// When true, keyboard input typed into one terminal of this tab is also
+    /// sent to the tab's other visible terminals.
+    @objc(broadcasting)
+    var broadcasting: Bool {
+        get {
+            guard NSApp.isAppleScriptEnabled else { return false }
+            return controller?.isBroadcastInputEnabled ?? false
+        }
+        set {
+            guard NSApp.isAppleScriptEnabled else { return }
+            controller?.setBroadcastInputEnabled(newValue)
+        }
+    }
+
     /// Best-effort native window containing this tab.
     var parentWindow: NSWindow? {
         guard NSApp.isAppleScriptEnabled else { return nil }

@@ -102,6 +102,13 @@ class BaseTerminalController: NSWindowController,
     /// Cancellable for aggregating bell state across all surfaces in this controller.
     private var bellStateCancellable: AnyCancellable?
 
+    /// What the programs in this controller's terminals report they are
+    /// doing, from their program status (OSC 7501) and progress (OSC 9;4)
+    /// reports.
+    @Published private(set) var activity: TerminalActivity = .idle
+
+    private var activityCancellable: AnyCancellable?
+
     /// Cancellable for clipboard confirmation requests from surfaces in this controller.
     private var clipboardConfirmationCancellable: AnyCancellable?
 
@@ -164,6 +171,7 @@ class BaseTerminalController: NSWindowController,
 
         // Setup our bell state for the window
         setupBellNotificationPublisher()
+        setupActivityNotificationPublisher()
         setupClipboardConfirmationPublisher()
 
         // Setup our notifications for behaviors
@@ -298,6 +306,10 @@ class BaseTerminalController: NSWindowController,
     func setBroadcastInputEnabled(_ enabled: Bool) {
         broadcastInputEnabled = enabled
     }
+
+    /// Whether broadcast input is turned on for this controller, regardless
+    /// of whether its window is currently visible.
+    var isBroadcastInputEnabled: Bool { broadcastInputEnabled }
 
     func postVerticalTabsDidChange() {
         NotificationCenter.default.post(
@@ -1804,6 +1816,44 @@ extension BaseTerminalController {
             }
     }
 
+    /// Publishes an app-wide notification whenever this terminal window's
+    /// aggregate activity changes. A program such as an AI coding agent reports
+    /// progress while it works, so this is what marks a tab as busy.
+    private func setupActivityNotificationPublisher() {
+        let progressPublisher = surfaceValuesPublisher(
+            valueKeyPath: \.progressReport,
+            publisherKeyPath: \.$progressReport
+        )
+
+        let statusPublisher = surfaceValuesPublisher(
+            valueKeyPath: \.programStatus,
+            publisherKeyPath: \.$programStatus
+        )
+
+        activityCancellable = Publishers.CombineLatest(progressPublisher, statusPublisher)
+            .map { progress, status in
+                // Both dictionaries are keyed by surface, but one can be a
+                // tree snapshot ahead of the other, so take the union.
+                let surfaces = Set(progress.keys).union(status.keys)
+                return TerminalActivity(combining: surfaces.map { id in
+                    TerminalActivity(
+                        progress: progress[id] ?? nil,
+                        status: status[id] ?? .init()
+                    )
+                })
+            }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] activity in
+                guard let self else { return }
+                self.activity = activity
+                NotificationCenter.default.post(
+                    name: .terminalWindowActivityDidChangeNotification,
+                    object: self
+                )
+            }
+    }
+
     /// Creates a publisher for values on all surfaces in this controller's tree.
     ///
     /// The publisher emits a dictionary of surface IDs to values whenever the tree changes
@@ -1835,4 +1885,7 @@ extension Notification.Name {
     /// Terminal window aggregate bell state changed.
     static let terminalWindowBellDidChangeNotification = Notification.Name("com.mitchellh.ghostty.terminalWindowBellDidChange")
     static let terminalWindowHasBellKey = terminalWindowBellDidChangeNotification.rawValue + ".hasBell"
+
+    /// Terminal window aggregate activity changed.
+    static let terminalWindowActivityDidChangeNotification = Notification.Name("com.mitchellh.ghostty.terminalWindowActivityDidChange")
 }
