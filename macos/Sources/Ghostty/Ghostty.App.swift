@@ -1980,7 +1980,7 @@ extension Ghostty {
             case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
-                guard let badge = String(cString: v.badge!, encoding: .utf8) else { return }
+                guard let badge = String(cString: v.badge, encoding: .utf8) else { return }
                 surfaceView.setBadge(badge)
 
             default:

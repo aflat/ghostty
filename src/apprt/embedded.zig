@@ -532,7 +532,7 @@ pub const Surface = struct {
             .size = .{ .width = 800, .height = 600 },
             .cursor_pos = .{ .x = -1, .y = -1 },
             .scrollback_history_path = if (opts.scrollback_history_path) |path|
-                try app.core_app.alloc.dupeZ(u8, std.mem.span(path))
+                try app.core_app.alloc.dupeSentinel(u8, std.mem.span(path), 0)
             else
                 null,
         };
@@ -595,7 +595,7 @@ pub const Surface = struct {
                 var command: configpkg.Command = undefined;
                 command.parseCLI(alloc, cmd) catch |err| {
                     log.warn("error parsing requested command command={s} err={}", .{ cmd, err });
-                    command = .{ .shell = try alloc.dupeZ(u8, cmd) };
+                    command = .{ .shell = try alloc.dupeSentinel(u8, cmd, 0) };
                 };
                 config.command = command;
                 config.@"initial-command" = null;
@@ -2092,7 +2092,7 @@ pub const CAPI = struct {
         } orelse return .empty;
         defer global.alloc().free(pwd);
 
-        const copy = global.alloc().dupeZ(u8, pwd) catch |err| {
+        const copy = global.alloc().dupeSentinel(u8, pwd, 0) catch |err| {
             log.err("error allocating pwd err={}", .{err});
             return .empty;
         };

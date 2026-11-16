@@ -1237,7 +1237,7 @@ pub fn handleMessage(self: *Surface, msg: Message) !void {
             defer w.deinit();
 
             // We always allocate for this because we need to null-terminate.
-            const str = try self.alloc.dupeZ(u8, w.slice());
+            const str = try self.alloc.dupeSentinel(u8, w.slice(), 0);
             defer self.alloc.free(str);
 
             _ = try self.rt_app.performAction(
@@ -5442,7 +5442,7 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
         },
 
         .set_surface_badge => |v| {
-            const badge = try self.alloc.dupeZ(u8, v);
+            const badge = try self.alloc.dupeSentinel(u8, v, 0);
             defer self.alloc.free(badge);
             return try self.rt_app.performAction(
                 .{ .surface = self },
