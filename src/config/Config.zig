@@ -3555,6 +3555,17 @@ keybind: Keybinds = .{},
 /// The default value is `true`.
 @"macos-tab-shortcut-label": bool = true,
 
+/// Whether to mark tabs in the vertical tab sidebar whose title you set
+/// yourself (for example with "Rename Tab...") with a small pencil icon
+/// beside the title. Hiding the icon doesn't change the title, and
+/// "Clear Custom Title" stays in the tab's context menu.
+///
+/// This option only has an effect when `macos-tabs-location` is set to
+/// `left` or `right`.
+///
+/// The default value is `true`.
+@"macos-tab-custom-title-indicator": bool = true,
+
 /// Whether to outline tabs in the vertical tab sidebar that are ringing
 /// the bell (for example, a program such as an AI coding agent prompting
 /// for input while its tab isn't focused). This makes it easy to spot,
