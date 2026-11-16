@@ -2078,6 +2078,12 @@ pub const CAPI = struct {
         };
     }
 
+    /// Returns the unique ID of the surface. This is the same value that
+    /// programs running in the surface see as GHOSTTY_SURFACE_ID.
+    export fn ghostty_surface_id(surface: *Surface) u64 {
+        return surface.core_surface.id;
+    }
+
     /// Returns the PID of the foreground process for the surface PTY.
     export fn ghostty_surface_foreground_pid(surface: *Surface) u64 {
         return surface.core_surface.getProcessInfo(.foreground_pid) orelse 0;

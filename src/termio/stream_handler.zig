@@ -360,6 +360,7 @@ pub const StreamHandler = struct {
             .show_desktop_notification => try self.showDesktopNotification(value.title, value.body),
             .progress_report => self.progressReport(value),
             .set_badge => try self.setBadge(value.badge),
+            .program_status => try self.programStatus(value),
             .start_hyperlink => try self.startHyperlink(value.uri, value.id),
             .clipboard_contents => try self.clipboardContents(value.kind, value.data),
             .semantic_prompt => try self.semanticPrompt(value),
@@ -389,7 +390,6 @@ pub const StreamHandler = struct {
             .title_pop,
             .kitty_dnd,
             .osc_unknown,
-            .program_status,
             => {},
         }
     }
@@ -998,6 +998,58 @@ pub const StreamHandler = struct {
     //-------------------------------------------------------------------------
     // OSC
 
+    fn programStatus(
+        self: *StreamHandler,
+        cmd: terminal.osc.Command.ProgramStatus,
+    ) !void {
+        const program_status = terminal.osc.program_status;
+
+        switch (cmd) {
+            // Answer a support query. Only the macOS app shows program
+            // status, so only it claims to support the protocol.
+            .query => |terminator| {
+                if (comptime !builtin.target.os.tag.isDarwin()) return;
+                switch (terminator) {
+                    inline else => |t| self.messageWriter(.{
+                        .write_stable = "\x1b]7501;" ++
+                            program_status.query_reply ++
+                            comptime t.string(),
+                    }),
+                }
+            },
+
+            // Hand the report to the apprt as one `key=value` per line,
+            // with `title` and `msg` decoded. Only values that apply to
+            // the report's state are written, and `state` comes first.
+            // Decoded text has no control characters, so the lines always
+            // split unambiguously.
+            .report => |report| {
+                var buf: [program_status.max_body_bytes]u8 = undefined;
+                var writer: std.Io.Writer = .fixed(&buf);
+                try writer.print("state={s}", .{@tagName(report.state)});
+                if (report.readOption(.id)) |v| try writer.print("\nid={s}", .{v});
+                if (report.readOption(.kind)) |v| try writer.print("\nkind={s}", .{@tagName(v)});
+                if (report.readOption(.progress)) |v| try writer.print("\nprogress={d}", .{v});
+                if (report.readOption(.app)) |v| try writer.print("\napp={s}", .{v});
+                if (report.readOption(.title) != null) {
+                    try writer.writeAll("\ntitle=");
+                    try report.writeText(.title, &writer);
+                }
+                if (report.readOption(.msg) != null) {
+                    try writer.writeAll("\nmsg=");
+                    try report.writeText(.msg, &writer);
+                }
+
+                self.surfaceMessageWriter(.{
+                    .program_status = try apprt.surface.Message.WriteReq.init(
+                        self.alloc,
+                        writer.buffered(),
+                    ),
+                });
+            },
+        }
+    }
+
     fn setBadge(self: *StreamHandler, badge: []const u8) !void {
         self.surfaceMessageWriter(.{
             .set_badge = try apprt.surface.Message.WriteReq.init(
@@ -1511,13 +1563,19 @@ pub const StreamHandler = struct {
                 self.surfaceMessageWriter(.{ .stop_command = code });
             },
 
+            // A new shell prompt means the program that reported it was
+            // working or blocked is gone, so the apprt drops those reports.
+            .fresh_line_new_prompt,
+            .prompt_start,
+            => self.surfaceMessageWriter(.{
+                .program_status = .{ .stable = apprt.action.ProgramStatus.event_prompt },
+            }),
+
             // Handled by Terminal, no special handling by us
             .end_prompt_start_input,
             .end_prompt_start_input_terminate_eol,
             .fresh_line,
-            .fresh_line_new_prompt,
             .new_command,
-            .prompt_start,
             => {},
         }
 

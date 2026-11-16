@@ -1247,6 +1247,20 @@ pub fn handleMessage(self: *Surface, msg: Message) !void {
             );
         },
 
+        .program_status => |w| {
+            defer w.deinit();
+
+            // We always allocate for this because we need to null-terminate.
+            const str = try self.alloc.dupeSentinel(u8, w.slice(), 0);
+            defer self.alloc.free(str);
+
+            _ = try self.rt_app.performAction(
+                .{ .surface = self },
+                .program_status,
+                .{ .report = str },
+            );
+        },
+
         .close => self.close(),
 
         .child_exited => |v| self.childExited(v),
@@ -1408,6 +1422,15 @@ fn selectionScrollTick(self: *Surface) !void {
 fn childExited(self: *Surface, info: apprt.surface.Message.ChildExited) void {
     // Mark our flag that we exited immediately
     self.child_exited = true;
+
+    // The programs that reported they were working or blocked are gone.
+    _ = self.rt_app.performAction(
+        .{ .surface = self },
+        .program_status,
+        .{ .report = apprt.action.ProgramStatus.event_exit },
+    ) catch |err| {
+        log.warn("apprt failed to handle program status err={}", .{err});
+    };
 
     // If our runtime was below some threshold then we assume that this
     // was an abnormal exit and we show an error message.

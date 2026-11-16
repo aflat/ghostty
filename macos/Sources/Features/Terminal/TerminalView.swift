@@ -95,6 +95,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                             bellOutlineEnabled: ghostty.config.macosTabBellOutline,
                             bellOutlineColor: ghostty.config.macosTabBellOutlineColor,
                             bellOutlineWidth: ghostty.config.macosTabBellOutlineWidth,
+                            shortcutLabelEnabled: ghostty.config.macosTabShortcutLabel,
                             windowController: windowController,
                             isRightSide: false
                         )
@@ -140,6 +141,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                             bellOutlineEnabled: ghostty.config.macosTabBellOutline,
                             bellOutlineColor: ghostty.config.macosTabBellOutlineColor,
                             bellOutlineWidth: ghostty.config.macosTabBellOutlineWidth,
+                            shortcutLabelEnabled: ghostty.config.macosTabShortcutLabel,
                             windowController: windowController,
                             isRightSide: true
                         )

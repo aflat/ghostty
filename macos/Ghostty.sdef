@@ -75,6 +75,7 @@
       <property name="focused terminal" code="GTfT" type="terminal" access="r" description="The currently focused terminal surface in this tab.">
         <cocoa key="focusedTerminal"/>
       </property>
+      <property name="broadcasting" code="GTbc" type="boolean" access="rw" description="Whether keyboard input is broadcast to every visible terminal in this tab."/>
       <responds-to command="select tab">
         <cocoa method="handleSelectTabCommand:"/>
       </responds-to>
@@ -98,6 +99,17 @@
       <property name="working directory" code="Gwdr" type="text" access="r" description="Current working directory for the terminal process."/>
       <property name="pid" code="Gpid" type="integer" access="r" description="PID of the foreground process in this terminal."/>
       <property name="tty" code="Gtty" type="text" access="r" description="TTY device path for this terminal (e.g. /dev/ttys016)."/>
+      <property name="visible text" code="Gvtx" type="text" access="r" description="The text currently visible in this terminal.">
+        <cocoa key="visibleText"/>
+      </property>
+      <property name="full text" code="Gftx" type="text" access="r" description="The scrollback and visible text of this terminal.">
+        <cocoa key="fullText"/>
+      </property>
+      <property name="badge" code="Gbdg" type="text" access="rw" description="The badge shown over this terminal. An empty string clears it."/>
+      <property name="surface id" code="Gsid" type="text" access="r" description="The value programs in this terminal see as the GHOSTTY_SURFACE_ID environment variable.">
+        <cocoa key="surfaceID"/>
+      </property>
+      <property name="activity" code="Gact" type="text" access="r" description="What the terminal's programs report they are doing: idle, working, done, error, or blocked."/>
       <responds-to command="split">
         <cocoa method="handleSplitCommand:"/>
       </responds-to>

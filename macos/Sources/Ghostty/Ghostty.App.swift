@@ -712,6 +712,9 @@ extension Ghostty {
             case GHOSTTY_ACTION_PROMPT_BADGE:
                 return promptBadge(app, target: target)
 
+            case GHOSTTY_ACTION_PROGRAM_STATUS:
+                programStatus(app, target: target, v: action.action.program_status)
+
             case GHOSTTY_ACTION_PWD:
                 pwdChanged(app, target: target, v: action.action.pwd)
 
@@ -1965,6 +1968,26 @@ extension Ghostty {
 
             default:
                 return false
+            }
+        }
+
+        private static func programStatus(
+            _ app: ghostty_app_t,
+            target: ghostty_target_s,
+            v: ghostty_action_program_status_s) {
+            switch target.tag {
+            case GHOSTTY_TARGET_APP:
+                Ghostty.logger.warning("program status does nothing with an app target")
+                return
+
+            case GHOSTTY_TARGET_SURFACE:
+                guard let surface = target.target.surface else { return }
+                guard let surfaceView = self.surfaceView(from: surface) else { return }
+                guard let report = String(cString: v.report, encoding: .utf8) else { return }
+                surfaceView.applyProgramStatus(report: report)
+
+            default:
+                assertionFailure()
             }
         }
 

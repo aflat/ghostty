@@ -120,6 +120,13 @@ extension Ghostty {
             ghostty_surface_mouse_captured(surface)
         }
 
+        /// The surface's unique ID, formatted the way programs running in
+        /// the surface see it in the `GHOSTTY_SURFACE_ID` environment variable.
+        @MainActor
+        var surfaceID: String {
+            String(format: "0x%016llx", ghostty_surface_id(surface))
+        }
+
         /// The PID of the foreground process group attached to the PTY.
         var foregroundPID: Int? {
             let pid = ghostty_surface_foreground_pid(surface)

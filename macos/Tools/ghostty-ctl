@@ -1,0 +1,253 @@
+#!/bin/bash
+#
+# ghostty-ctl: control Ghostty terminals from a script or an AI agent.
+#
+# A thin wrapper over Ghostty's AppleScript dictionary (macos/Ghostty.sdef).
+# See ghostty-ctl.md beside this file for the guide written for agents.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ghostty-ctl COMMAND [-t TERMINAL] [ARGS]
+
+Commands:
+  whoami                     Print the ID of the terminal this runs in
+  list                       List terminals: ID, activity, badge, directory, title
+  split [DIR] [-- CMD...]    Split a terminal (right, left, down, up; default
+                             right) and print the new terminal's ID
+  send TEXT                  Type TEXT into a terminal, as if pasted
+  key KEY [MODIFIERS]        Press KEY, such as enter; MODIFIERS is a
+                             comma-separated list: shift,control,option,command
+  read [--all]               Print the visible text, or with --all the
+                             scrollback too
+  badge [TEXT]               Print the badge, or set it; "" clears it
+  activity                   Print idle, working, done, error, or blocked
+  broadcast [on|off]         Print or set broadcast input for the terminal's tab
+  focus                      Focus a terminal and bring its window forward
+  close                      Close a terminal
+  guide                      Print the guide for agents
+
+Options:
+  -t TERMINAL   The terminal to act on: an ID from whoami, list, or split.
+                Defaults to the terminal this runs in.
+
+Environment:
+  GHOSTTY_CTL_APP   The Ghostty app to control, as a name or a path to its
+                    .app bundle. Defaults to the app this runs in.
+EOF
+}
+
+die() {
+  echo "ghostty-ctl: $*" >&2
+  exit 1
+}
+
+# The guide sits beside this script in the repository, and in the app's
+# Resources when this script is installed in Ghostty.app/Contents/MacOS.
+guide_path() {
+  local self="$0" dir
+  # Follow a symlink to the real script, so its neighbors can be found.
+  while [[ -L "$self" ]]; do
+    dir="$(cd "$(dirname "$self")" && pwd)"
+    self="$(readlink "$self")"
+    [[ "$self" == /* ]] || self="$dir/$self"
+  done
+  dir="$(cd "$(dirname "$self")" && pwd)"
+  local candidate
+  for candidate in "$dir/ghostty-ctl.md" "$dir/../Resources/ghostty-ctl.md"; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# The app to control: an explicit choice, else the app whose terminal we are
+# running in, else whichever app is named Ghostty.
+app="${GHOSTTY_CTL_APP:-}"
+if [[ -z "$app" && "${GHOSTTY_BIN_DIR:-}" == *.app/Contents/MacOS ]]; then
+  app="${GHOSTTY_BIN_DIR%/Contents/MacOS}"
+fi
+app="${app:-Ghostty}"
+
+# Runs an AppleScript against the app. The script body sees `argv` and can
+# call findTerminal(sel), where sel is a terminal ID or a GHOSTTY_SURFACE_ID.
+run() {
+  local body="$1"
+  shift
+  local escaped="${app//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  osascript - "$@" <<EOF
+on findTerminal(sel)
+  tell application "$escaped"
+    if sel starts with "0x" then
+      repeat with t in terminals
+        if surface id of t is sel then return terminal id (id of t)
+      end repeat
+      error "no terminal has the surface ID " & sel
+    end if
+    return terminal id sel
+  end tell
+end findTerminal
+
+on run argv
+  tell application "$escaped"
+    $body
+  end tell
+end run
+EOF
+}
+
+[[ $# -ge 1 ]] || { usage >&2; exit 2; }
+command="$1"
+shift
+
+target=""
+if [[ "${1:-}" == "-t" ]]; then
+  [[ $# -ge 2 ]] || die "-t needs a terminal ID"
+  target="$2"
+  shift 2
+fi
+if [[ -z "$target" ]]; then
+  target="${GHOSTTY_SURFACE_ID:-}"
+fi
+need_target() {
+  [[ -n "$target" ]] || die "not running in a Ghostty terminal; pass -t TERMINAL"
+}
+
+case "$command" in
+  whoami)
+    need_target
+    run 'return id of my findTerminal(item 1 of argv)' "$target"
+    ;;
+
+  list)
+    run '
+      set out to ""
+      repeat with t in terminals
+        set out to out & (id of t) & tab & (activity of t) & tab & (badge of t) & tab & (working directory of t) & tab & (name of t) & linefeed
+      end repeat
+      return out' | sed '/^$/d'
+    ;;
+
+  split)
+    need_target
+    direction="right"
+    if [[ $# -ge 1 && "$1" != "--" ]]; then
+      direction="$1"
+      shift
+    fi
+    case "$direction" in
+      right | left | down | up) ;;
+      *) die "unknown direction \"$direction\"; use right, left, down, or up" ;;
+    esac
+    cmd=""
+    if [[ "${1:-}" == "--" ]]; then
+      shift
+      [[ $# -ge 1 ]] || die "no command after --"
+      cmd="$(printf '%q ' "$@")"
+    fi
+    run "
+      set t to my findTerminal(item 1 of argv)
+      set cfg to new surface configuration
+      if (item 2 of argv) is not \"\" then set command of cfg to (item 2 of argv)
+      return id of (split t direction $direction with configuration cfg)" "$target" "$cmd"
+    ;;
+
+  send)
+    need_target
+    [[ $# -eq 1 ]] || die "send takes one argument, the text"
+    run 'input text (item 2 of argv) to my findTerminal(item 1 of argv)' "$target" "$1"
+    ;;
+
+  key)
+    need_target
+    [[ $# -ge 1 && $# -le 2 ]] || die "key takes a key name and optional modifiers"
+    run '
+      set t to my findTerminal(item 1 of argv)
+      if (item 3 of argv) is "" then
+        send key (item 2 of argv) to t
+      else
+        send key (item 2 of argv) modifiers (item 3 of argv) to t
+      end if' "$target" "$1" "${2:-}"
+    ;;
+
+  read)
+    need_target
+    property="visible text"
+    if [[ "${1:-}" == "--all" ]]; then
+      property="full text"
+    fi
+    run "return $property of my findTerminal(item 1 of argv)" "$target"
+    ;;
+
+  badge)
+    need_target
+    if [[ $# -eq 0 ]]; then
+      run 'return badge of my findTerminal(item 1 of argv)' "$target"
+    else
+      run 'set badge of my findTerminal(item 1 of argv) to (item 2 of argv)' "$target" "$1"
+    fi
+    ;;
+
+  activity)
+    need_target
+    run 'return activity of my findTerminal(item 1 of argv)' "$target"
+    ;;
+
+  broadcast)
+    need_target
+    # A terminal doesn't know its tab, so look for the tab that holds it.
+    find_tab='
+      set t to my findTerminal(item 1 of argv)
+      set wanted to id of t
+      set found to missing value
+      repeat with w in windows
+        repeat with b in tabs of w
+          repeat with other in terminals of b
+            if id of other is wanted then set found to b
+          end repeat
+        end repeat
+      end repeat
+      if found is missing value then error "the terminal is not in a tab"'
+    case "${1:-}" in
+      "") run "$find_tab
+      if broadcasting of found then
+        return \"on\"
+      else
+        return \"off\"
+      end if" "$target" ;;
+      on) run "$find_tab
+      set broadcasting of found to true" "$target" ;;
+      off) run "$find_tab
+      set broadcasting of found to false" "$target" ;;
+      *) die "broadcast takes on or off" ;;
+    esac
+    ;;
+
+  focus)
+    need_target
+    run 'focus (my findTerminal(item 1 of argv))' "$target"
+    ;;
+
+  close)
+    need_target
+    run 'close (my findTerminal(item 1 of argv))' "$target"
+    ;;
+
+  guide)
+    path="$(guide_path)" || die "the guide, ghostty-ctl.md, is missing"
+    cat "$path"
+    ;;
+
+  -h | --help | help)
+    usage
+    ;;
+
+  *)
+    usage >&2
+    die "unknown command \"$command\""
+    ;;
+esac

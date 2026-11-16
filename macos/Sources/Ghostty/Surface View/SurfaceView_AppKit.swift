@@ -262,44 +262,10 @@ extension Ghostty {
 
             // Our cache of screen data
             cachedScreenContents = .init(duration: .milliseconds(500)) { [weak self] in
-                guard let self else { return "" }
-                guard let surface = self.surface else { return "" }
-                var text = ghostty_text_s()
-                let sel = ghostty_selection_s(
-                    top_left: ghostty_point_s(
-                        tag: GHOSTTY_POINT_SCREEN,
-                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
-                        x: 0,
-                        y: 0),
-                    bottom_right: ghostty_point_s(
-                        tag: GHOSTTY_POINT_SCREEN,
-                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
-                        x: 0,
-                        y: 0),
-                    rectangle: false)
-                guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
-                defer { ghostty_surface_free_text(surface, &text) }
-                return String(cString: text.text)
+                self?.readText(in: GHOSTTY_POINT_SCREEN) ?? ""
             }
             cachedVisibleContents = .init(duration: .milliseconds(500)) { [weak self] in
-                guard let self else { return "" }
-                guard let surface = self.surface else { return "" }
-                var text = ghostty_text_s()
-                let sel = ghostty_selection_s(
-                    top_left: ghostty_point_s(
-                        tag: GHOSTTY_POINT_VIEWPORT,
-                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
-                        x: 0,
-                        y: 0),
-                    bottom_right: ghostty_point_s(
-                        tag: GHOSTTY_POINT_VIEWPORT,
-                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
-                        x: 0,
-                        y: 0),
-                    rectangle: false)
-                guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
-                defer { ghostty_surface_free_text(surface, &text) }
-                return String(cString: text.text)
+                self?.readText(in: GHOSTTY_POINT_VIEWPORT) ?? ""
             }
 
             // Set a timer to show the ghost emoji after 500ms if no title is set
@@ -479,6 +445,9 @@ extension Ghostty {
                 // We unset our bell state if we gained focus
                 bell = false
 
+                // The user is looking, so they have seen what finished or failed.
+                acknowledgeProgramStatus()
+
                 // Remove any notifications for this surface once we gain focus.
                 if !notificationIdentifiers.isEmpty {
                     UNUserNotificationCenter.current()
@@ -648,6 +617,30 @@ extension Ghostty {
                 titleFromTerminal = nil
                 setTitle(prevTitle)
             }
+        }
+
+        /// Reads the terminal's text right now, without the cache.
+        ///
+        /// `GHOSTTY_POINT_SCREEN` covers the scrollback and the visible screen,
+        /// and `GHOSTTY_POINT_VIEWPORT` only what is currently visible.
+        func readText(in tag: ghostty_point_tag_e) -> String {
+            guard let surface = self.surface else { return "" }
+            var text = ghostty_text_s()
+            let sel = ghostty_selection_s(
+                top_left: ghostty_point_s(
+                    tag: tag,
+                    coord: GHOSTTY_POINT_COORD_TOP_LEFT,
+                    x: 0,
+                    y: 0),
+                bottom_right: ghostty_point_s(
+                    tag: tag,
+                    coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
+                    x: 0,
+                    y: 0),
+                rectangle: false)
+            guard ghostty_surface_read_text(surface, sel, &text) else { return "" }
+            defer { ghostty_surface_free_text(surface, &text) }
+            return String(cString: text.text)
         }
 
         /// Set the surface badge by prompting the user.
@@ -1163,6 +1156,9 @@ extension Ghostty {
                 self.interpretKeyEvents([event])
                 return
             }
+
+            // Typing here means the user has seen what finished or failed.
+            acknowledgeProgramStatus()
 
             // On any keyDown event we unset our bell state
             bell = false
